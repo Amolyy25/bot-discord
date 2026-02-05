@@ -32,6 +32,11 @@ module.exports = {
                     inline: false
                 },
                 {
+                    name: 'Configuration',
+                    value: '`-setup` | `/setup` - Configure le serveur depuis le template JSON',
+                    inline: false
+                },
+                {
                     name: 'Informations',
                     value: 'Les commandes slash (`/`) sont recommandées pour une meilleure expérience!\nLors d\'une sanction, vous devrez choisir une catégorie et une gravité spécifique.\n\nUtilisez `-sanctions @user` pour voir l\'historique complet.',
                     inline: false
@@ -70,6 +75,11 @@ module.exports = {
                 {
                     name: 'Nettoyage',
                     value: '`-clear` | `/clear` - Supprime des messages (1-100)',
+                    inline: false
+                },
+                {
+                    name: 'Configuration',
+                    value: '`-setup` | `/setup` - Configure le serveur depuis le template JSON',
                     inline: false
                 },
                 {

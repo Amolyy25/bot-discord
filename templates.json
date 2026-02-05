@@ -1,0 +1,90 @@
+{
+  "name": "Lyon Campus Vibes 🎓",
+  "description": "QG communautaire étudiants Lyon : Ynov SIO, Lyon1/2/3, INSA, EM, CPE... Chill + entraide + apéros !",
+  "usage": "Communauté étudiante multi-écoles Lyon 2026",
+  "splash": null,
+  "discovery_splash": null,
+  "roles": [
+    {"name": "👑 Admin", "color": "0xFF0000", "permissions": 8, "hoist": true},
+    {"name": "⚙️ Modo", "color": "0x00FF00", "permissions": 268435456, "hoist": true},
+    {"name": "🏫 Ynov-SIO", "color": "0xFF6B6B", "hoist": true},
+    {"name": "🏫 Lyon1-Info", "color": "0x4ECDC4", "hoist": true},
+    {"name": "🏫 Lyon2-Psycho", "color": "0x45B7D1", "hoist": true},
+    {"name": "🏫 INSA-CPE", "color": "0x96CEB4", "hoist": true},
+    {"name": "🏫 EMlyon-Commerce", "color": "0xFECA57", "hoist": true},
+    {"name": "🏫 Bellecour-Design", "color": "0xFF9FF3", "hoist": true},
+    {"name": "🔧 Alternant", "color": "0x54A0FF", "hoist": true},
+    {"name": "😂 MemeLord", "color": "0x5F27CD"},
+    {"name": "🆘 DebugHero", "color": "0x00D2D3"},
+    {"name": "🍻 ApéroKing", "color": "0xFF9F43"},
+    {"name": "@everyone", "color": "0x36393F"}
+  ],
+  "channels": [
+    {
+      "name": "🏫-ecoles-filieres",
+      "type": 4,
+      "position": 0,
+      "permission_overwrites": [
+        {"id": "roleid", "deny": 0, "allow": 1048576}
+      ]
+    },
+    {"name": "#ynov-sio-dev", "type": 0, "position": 1, "topic": "BTS SIO • Node.js • APIs • Alternance Lyon"},
+    {"name": "#lyon1-2-3-info", "type": 0, "position": 2, "topic": "Licence/Master info • Algo • Projets"},
+    {"name": "#commerce-em-bellecour", "type": 0, "position": 3, "topic": "EM Lyon • Kedge • Marketing • Business"},
+    {"name": "#psycho-shs-design", "type": 0, "position": 4, "topic": "Lyon2 psycho • Com • Design • Créa"},
+    {"name": "#insa-cpe-sante", "type": 0, "position": 5, "topic": "INSA • CPE • Pharma • Médecine"},
+
+    {
+      "name": "💬-social-lyon",
+      "type": 4,
+      "position": 6,
+      "permission_overwrites": []
+    },
+    {"name": "#general-campus", "type": 0, "position": 7, "topic": "Quotidien • Quartiers • Soirées Lyon"},
+    {"name": "#memes-etudiants", "type": 0, "position": 8, "topic": "Prof drôles • Exam fails • Parodies cours"},
+    {"name": "#bons-plans-lyon", "type": 0, "position": 9, "topic": "Sorties • Restos étudiants • Covoit"},
+    {"name": "#logement-coloc", "type": 0, "position": 10, "topic": "Apparts • APL • Colocs Lyon"},
+
+    {
+      "name": "🆘-entraide",
+      "type": 4,
+      "position": 11
+    },
+    {"name": "#entraide-rapide", "type": 0, "position": 12, "topic": "Debug code • TD urgents • Partiels"},
+    {"name": "#alternance-stage", "type": 0, "position": 13, "topic": "CV • Entretiens • Offres Lyon"},
+    {"name": "#examens-revisions", "type": 0, "position": 14, "topic": "Partages cours • Quiz • Sessions focus"},
+
+    {
+      "name": "🎉-evenements",
+      "type": 4,
+      "position": 15
+    },
+    {"name": "#events-campus", "type": 0, "position": 16, "topic": "Apéros école • Co-working • LAN"},
+    {"name": "#showcase-projets", "type": 0, "position": 17, "topic": "App • Business plan • Portfolio"},
+
+    {
+      "name": "🛬-accueil",
+      "type": 4,
+      "position": 18
+    },
+    {"name": "#bienvenue-lyon", "type": 0, "position": 19, "topic": "🎓 Onboarding • Règles • Questions 3-clics"},
+    {"name": "#📢-annonces", "type": 0, "position": 20, "topic": "[Mods only] Events • Offres alternance"},
+
+    {
+      "name": "⚙️-systeme",
+      "type": 4,
+      "position": 21,
+      "permission_overwrites": [
+        {"id": "roleid", "deny": 2048, "allow": 0}
+      ]
+    },
+    {"name": "#system-leaderboard", "type": 0, "position": 22, "topic": "XP • Rôles auto • Économie"}
+  ],
+  "voice_channels": [
+    {"name": "Chill Lyon 24/7", "position": 0, "bitrate": 384000, "user_limit": 0},
+    {"name": "Apéro Tech Vendredi", "position": 1, "bitrate": 384000},
+    {"name": "Debug Live Express", "position": 2, "bitrate": 384000},
+    {"name": "Co-working Matin", "position": 3, "bitrate": 384000},
+    {"name": "Event du Moment", "position": 4, "bitrate": 384000}
+  ]
+}
