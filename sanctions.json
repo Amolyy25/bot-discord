@@ -1,0 +1,64 @@
+{
+  "1080916868791025795": {
+    "1285621421304971285": [
+      {
+        "type": "tempmute",
+        "level": "1",
+        "moderator": "amolyy_",
+        "reason": "Aucune raison fournie",
+        "duration": "10m",
+        "points": 1,
+        "timestamp": "2026-02-05T18:05:44.786Z",
+        "expiresAt": "2026-02-05T18:15:44.786Z"
+      },
+      {
+        "type": "tempmute",
+        "level": "1",
+        "moderator": "amolyy_",
+        "reason": "Aucune raison fournie",
+        "category": "Autre",
+        "gravity": "Moyenne",
+        "duration": "10m",
+        "timestamp": "2026-02-05T18:15:44.514Z",
+        "expiresAt": "2026-02-05T18:25:44.514Z"
+      },
+      {
+        "type": "tempmute",
+        "level": "1",
+        "moderator": "amolyy_",
+        "reason": "Mute interactif: Propos déplacés",
+        "category": "Propos déplacés",
+        "gravity": "Moyenne",
+        "duration": "10m",
+        "timestamp": "2026-02-05T18:18:22.974Z",
+        "expiresAt": "2026-02-05T18:28:22.974Z"
+      },
+      {
+        "type": "kick",
+        "level": "1",
+        "moderator": "amolyy_",
+        "reason": "Aucune raison fournie",
+        "category": "Autre",
+        "gravity": "Moyenne",
+        "duration": "instantané",
+        "timestamp": "2026-02-05T18:21:33.517Z",
+        "expiresAt": null
+      }
+    ]
+  },
+  "1150507809121775776": {
+    "947510437782618192": [
+      {
+        "type": "tempmute",
+        "level": "2",
+        "moderator": "amolyy_",
+        "reason": "Propos dérangeant",
+        "category": "Propos déplacés",
+        "gravity": "Propos dérangeant",
+        "duration": "20m",
+        "timestamp": "2026-02-05T18:36:24.448Z",
+        "expiresAt": "2026-02-05T18:56:24.448Z"
+      }
+    ]
+  }
+}

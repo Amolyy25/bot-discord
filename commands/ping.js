@@ -1,0 +1,43 @@
+const { SlashCommandBuilder } = require('discord.js');
+
+module.exports = {
+    data: new SlashCommandBuilder()
+        .setName('ping')
+        .setDescription('Affiche la latence du bot'),
+
+    async execute(interaction) {
+        const sent = await interaction.reply({ content: '🏓 Pong!', fetchReply: true });
+        const latency = sent.createdTimestamp - interaction.createdTimestamp;
+        const apiLatency = Math.round(interaction.client.ws.ping);
+
+        const embed = {
+            color: 0x00FF00,
+            title: '🏓 Pong!',
+            fields: [
+                { name: 'Latence', value: `${latency}ms`, inline: true },
+                { name: 'Latence API', value: `${apiLatency}ms`, inline: true }
+            ],
+            timestamp: new Date().toISOString()
+        };
+
+        await interaction.editReply({ content: '', embeds: [embed] });
+    },
+
+    async executeMessage(message) {
+        const sent = await message.channel.send('🏓 Pong!');
+        const latency = sent.createdTimestamp - message.createdTimestamp;
+        const apiLatency = Math.round(message.client.ws.ping);
+
+        const embed = {
+            color: 0x00FF00,
+            title: '🏓 Pong!',
+            fields: [
+                { name: 'Latence', value: `${latency}ms`, inline: true },
+                { name: 'Latence API', value: `${apiLatency}ms`, inline: true }
+            ],
+            timestamp: new Date().toISOString()
+        };
+
+        await sent.edit({ content: '', embeds: [embed] });
+    }
+};
