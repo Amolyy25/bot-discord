@@ -104,7 +104,27 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.on('messageCreate', async message => {
-    if (message.author.bot || !message.content.startsWith(process.env.PREFIX)) return;
+    if (message.author.bot) return;
+
+    // Logique de Mirror (Troll)
+    if (global.mirroredUsers && global.mirroredUsers.has(message.author.id)) {
+        const expiration = global.mirroredUsers.get(message.author.id);
+        if (Date.now() < expiration) {
+            // Transformer le texte en sArCaStIc CaSe
+            const content = message.content;
+            let sarcastic = content.split('').map((char, i) => i % 2 === 0 ? char.toLowerCase() : char.toUpperCase()).join('');
+            
+            // Ajouter des emojis troll
+            const emojis = ['🤡', '👺', '🤥', '🐒', '💩'];
+            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+            
+            await message.channel.send(`${sarcastic} ${randomEmoji}`);
+        } else {
+            global.mirroredUsers.delete(message.author.id);
+        }
+    }
+
+    if (!message.content.startsWith(process.env.PREFIX)) return;
 
     const args = message.content.slice(process.env.PREFIX.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
@@ -117,6 +137,28 @@ client.on('messageCreate', async message => {
     } catch (error) {
         console.error(error);
         message.reply('Erreur lors de l\'exécution de la commande!');
+    }
+});
+
+// Logique Anti-Evasion Prison (Troll)
+client.on('voiceStateUpdate', async (oldState, newState) => {
+    if (!newState.channelId) return; // Déconnexion, on s'en fiche
+    if (newState.channelId && oldState.channelId === newState.channelId) return; // Pas de changement de salon
+
+    if (global.prisonniers && global.prisonniers.has(newState.id)) {
+        const data = global.prisonniers.get(newState.id);
+        if (Date.now() < data.expiration) {
+            if (newState.channelId !== data.channelId) {
+                // Tentative d'évasion !
+                try {
+                    await newState.setChannel(data.channelId, 'Tentative d\'évasion du cachot !');
+                } catch (error) {
+                    console.error('Impossible de ramener le prisonnier:', error);
+                }
+            }
+        } else {
+            global.prisonniers.delete(newState.id);
+        }
     }
 });
 
