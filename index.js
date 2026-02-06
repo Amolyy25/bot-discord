@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 const http = require('http');
+const cron = require('node-cron');
+const statsCommand = require('./commands/stats.js');
 
 // Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
 const PORT = process.env.PORT || 8080;
@@ -164,6 +166,45 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 
 client.once('ready', () => {
     console.log(`Connecté en tant que ${client.user.tag}`);
+
+    // Cron job à 9h00
+    cron.schedule('0 9 * * *', async () => {
+        console.log('Exécution de la tâche cron pour les stats...');
+        const statsChannelId = '1469073406917083308';
+        
+        try {
+            const channel = await client.channels.fetch(statsChannelId);
+            if (!channel) return console.error('Salon stats introuvable');
+
+            const guild = channel.guild;
+            await guild.members.fetch();
+            
+            const totalMembers = guild.memberCount;
+            const onlineMembers = guild.members.cache.filter(m => m.presence?.status === 'online' || m.presence?.status === 'dnd' || m.presence?.status === 'idle').size;
+            const boostCount = guild.premiumSubscriptionCount || 0;
+            const boostLevel = guild.premiumTier;
+
+            const embed = {
+                color: 0x5865F2,
+                title: `📊 Rapport Quotidien - ${guild.name}`,
+                thumbnail: { url: guild.iconURL({ dynamic: true }) },
+                fields: [
+                    { name: '👥 Membres Totaux', value: `${totalMembers}`, inline: true },
+                    { name: '🟢 Actuellement en ligne', value: `${onlineMembers}`, inline: true },
+                    { name: '🚀 Niveau de Boost', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
+                ],
+                footer: { text: 'Stats quotidiennes (9:00)' },
+                timestamp: new Date().toISOString()
+            };
+
+            await channel.send({ embeds: [embed] });
+            console.log('Stats envoyées avec succès à 9h00');
+        } catch (error) {
+            console.error('Erreur lors de l\'envoi des stats cron:', error);
+        }
+    }, {
+        timezone: "Europe/Paris"
+    });
 });
 
 client.login(process.env.TOKEN);
