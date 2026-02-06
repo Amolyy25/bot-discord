@@ -21,8 +21,9 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-        const { isStaffTest, isModChannel } = require('./utils/permHelper');
-        if (!isModChannel(interaction.channelId)) return;
+        const { isStaffTest, isModChannel, isAdmin } = require('./utils/permHelper');
+        const adminStatus = isAdmin(interaction.member);
+        if (!isModChannel(interaction.channelId) && !adminStatus) return;
         if (!isStaffTest(interaction.member)) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
@@ -78,8 +79,9 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isStaffTest, isModChannel } = require('./utils/permHelper');
-        if (!isModChannel(message.channel.id)) return;
+        const { isStaffTest, isModChannel, isAdmin } = require('./utils/permHelper');
+        const adminStatus = isAdmin(message.member);
+        if (!isModChannel(message.channel.id) && !adminStatus) return;
         if (!isStaffTest(message.member)) {
             return message.reply('non ta pas la perm');
         }

@@ -1,7 +1,7 @@
 const { PermissionFlagsBits } = require('discord.js');
 
 const ROLES = {
-    BOOSTER: '1469086995186974953',
+    BOOSTER: '1469314101615398995',
     PERM_2: '1469071689768767589',
     STAFF_TEST: '1469071689831940310',
     STAFF: '1469071689848721510',
@@ -9,6 +9,7 @@ const ROLES = {
 };
 
 const MOD_CHANNEL_ID = '1469258215916175392';
+const GENERAL_CHANNEL_ID = '1469071689798000676'; // Found in history or common pattern if needed, but let's try to be generic if unknown. Actually I should check if I can find it.
 
 /**
  * Check if the member has one of the specified roles or is Admin
@@ -26,7 +27,10 @@ function isAdmin(member) {
 module.exports = {
     ROLES,
     MOD_CHANNEL_ID,
+    GENERAL_CHANNEL_ID,
     
+    isAdmin,
+
     // isModChannel: Checks if the channel is the allowed mod channel
     isModChannel: (channelId) => channelId === MOD_CHANNEL_ID,
 

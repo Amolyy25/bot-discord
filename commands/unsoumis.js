@@ -12,11 +12,13 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
-        if (!isModChannel(interaction.channelId)) return;
+        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
         if (!isPerm3OrAdmin(interaction.member)) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
+        const adminStatus = isAdmin(interaction.member);
+        const isGeneral = interaction.channel.name.toLowerCase().includes('general');
+        if (!isModChannel(interaction.channelId) && !isGeneral && !adminStatus) return;
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
@@ -55,11 +57,13 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
-        if (!isModChannel(message.channel.id)) return;
+        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
         if (!isPerm3OrAdmin(message.member)) {
             return message.reply('non ta pas la perm');
         }
+        const adminStatus = isAdmin(message.member);
+        const isGeneral = message.channel.name.toLowerCase().includes('general');
+        if (!isModChannel(message.channel.id) && !isGeneral && !adminStatus) return;
 
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
         if (!target) return message.reply('Usage: -unsoumis @utilisateur ou ID');

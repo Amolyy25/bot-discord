@@ -70,12 +70,23 @@ const snipes = new Collection();
 
 client.on('messageDelete', async (message) => {
     if (message.author.bot || message.content.length === 0) return;
-    snipes.set(message.channel.id, {
-        content: message.content,
+    
+    if (!snipes.has(message.channel.id)) {
+        snipes.set(message.channel.id, []);
+    }
+    
+    const channelSnipes = snipes.get(message.channel.id);
+    channelSnipes.unshift({
+        content: message.content || '',
         author: message.author,
         image: message.attachments.first()?.url || null,
-        timestamp: message.createdTimestamp
+        timestamp: Date.now()
     });
+    
+    // Garder seulement les 15 derniers snipes par salon
+    if (channelSnipes.length > 15) {
+        channelSnipes.pop();
+    }
 });
 
 client.on('interactionCreate', async interaction => {
