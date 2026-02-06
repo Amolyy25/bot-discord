@@ -12,6 +12,11 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        const { isStaffTest, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(interaction.channelId)) return;
+        if (!isStaffTest(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
@@ -25,8 +30,10 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-            return message.reply('Vous n\'avez pas la permission de modérer les membres!');
+        const { isStaffTest, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(message.channel.id)) return;
+        if (!isStaffTest(message.member)) {
+            return message.reply('non ta pas la perm');
         }
 
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
@@ -147,6 +154,16 @@ async function startInteractiveMute(context, target, member) {
                 }
 
                 addSanction(i.guild.id, target.id, 'tempmute', selections.level, user.tag, null, selections.category, selections.gravityLabel);
+
+                const { logModAction } = require('./utils/logHelper');
+                await logModAction(i.guild, {
+                    action: 'TEMPMUTE',
+                    moderator: user,
+                    target: target,
+                    reason: selections.gravityLabel,
+                    details: `Durée: ${selections.duration}\nCatégorie: ${selections.category}`,
+                    color: 0x5865F2
+                });
 
                 const finalEmbed = {
                     color: selections.level === '3' ? 0xFF0000 : selections.level === '2' ? 0xFFA500 : 0x00FF00,

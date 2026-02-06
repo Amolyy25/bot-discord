@@ -14,8 +14,10 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-            return interaction.reply({ content: 'Vous n\'avez pas la permission de démuter les membres!', ephemeral: true });
+        const { isStaff, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(interaction.channelId)) return;
+        if (!isStaff(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
 
         const target = interaction.options.getUser('utilisateur');
@@ -33,6 +35,15 @@ module.exports = {
             if (mutedRole && member.roles.cache.has(mutedRole.id)) {
                 await member.roles.remove(mutedRole).catch(() => {});
             }
+
+            const { logModAction } = require('./utils/logHelper');
+            await logModAction(interaction.guild, {
+                action: 'UNMUTE',
+                moderator: interaction.user,
+                target: target,
+                reason: reason,
+                color: 0x00FF00
+            });
 
             const embed = {
                 color: 0x00FF00,
@@ -54,8 +65,10 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-            return message.reply('Vous n\'avez pas la permission de démuter les membres!');
+        const { isStaff, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(message.channel.id)) return;
+        if (!isStaff(message.member)) {
+            return message.reply('non ta pas la perm');
         }
 
         if (!args[0]) {
@@ -81,6 +94,15 @@ module.exports = {
             if (mutedRole && member.roles.cache.has(mutedRole.id)) {
                 await member.roles.remove(mutedRole).catch(() => {});
             }
+
+            const { logModAction } = require('./utils/logHelper');
+            await logModAction(message.guild, {
+                action: 'UNMUTE',
+                moderator: message.author,
+                target: target,
+                reason: reason,
+                color: 0x00FF00
+            });
 
             const embed = {
                 color: 0x00FF00,

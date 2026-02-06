@@ -6,6 +6,11 @@ module.exports = {
         .setDescription('Affiche la latence du bot'),
 
     async execute(interaction) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(interaction.channelId)) return;
+        if (!isPerm3OrAdmin(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const sent = await interaction.reply({ content: '🏓 Pong!', fetchReply: true });
         const latency = sent.createdTimestamp - interaction.createdTimestamp;
         const apiLatency = Math.round(interaction.client.ws.ping);
@@ -24,6 +29,11 @@ module.exports = {
     },
 
     async executeMessage(message) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(message.channel.id)) return;
+        if (!isPerm3OrAdmin(message.member)) {
+            return message.reply('non ta pas la perm');
+        }
         const sent = await message.channel.send('🏓 Pong!');
         const latency = sent.createdTimestamp - message.createdTimestamp;
         const apiLatency = Math.round(message.client.ws.ping);

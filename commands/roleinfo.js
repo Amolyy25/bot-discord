@@ -10,6 +10,11 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(interaction.channelId)) return;
+        if (!isPerm3OrAdmin(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const role = interaction.options.getRole('rôle');
 
         const permissions = role.permissions
@@ -45,6 +50,11 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(message.channel.id)) return;
+        if (!isPerm3OrAdmin(message.member)) {
+            return message.reply('non ta pas la perm');
+        }
         if (!args[0]) {
             return message.reply('Veuillez mentionner ou nommer un rôle!');
         }

@@ -10,8 +10,10 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            return interaction.reply({ content: 'Vous n\'avez pas la permission de supprimer des messages!', ephemeral: true });
+        const { isStaff, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(interaction.channelId)) return;
+        if (!isStaff(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
 
         const amount = interaction.options.getInteger('nombre');
@@ -36,6 +38,14 @@ module.exports = {
 
             const reply = await interaction.channel.send({ embeds: [embed] });
             setTimeout(() => reply.delete().catch(() => {}), 5000);
+
+            const { logModAction } = require('./utils/logHelper');
+            await logModAction(interaction.guild, {
+                action: 'CLEAR',
+                moderator: interaction.user,
+                details: `Nombre: ${amount} messages\nSalon: ${interaction.channel.name}`,
+                color: 0x00FF00
+            });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'Erreur lors de la suppression des messages!', ephemeral: true });
@@ -43,8 +53,10 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            return message.reply('Vous n\'avez pas la permission de supprimer des messages!');
+        const { isStaff, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(message.channel.id)) return;
+        if (!isStaff(message.member)) {
+            return message.reply('non ta pas la perm');
         }
 
         const amount = parseInt(args[0]);
@@ -69,6 +81,14 @@ module.exports = {
 
             const reply = await message.channel.send({ embeds: [embed] });
             setTimeout(() => reply.delete().catch(() => {}), 5000);
+
+            const { logModAction } = require('./utils/logHelper');
+            await logModAction(message.guild, {
+                action: 'CLEAR',
+                moderator: message.author,
+                details: `Nombre: ${amount} messages\nSalon: ${message.channel.name}`,
+                color: 0x00FF00
+            });
         } catch (error) {
             console.error(error);
             message.reply('Erreur lors de la suppression des messages!');

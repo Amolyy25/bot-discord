@@ -6,6 +6,11 @@ module.exports = {
         .setDescription('Affiche les informations du serveur'),
 
     async execute(interaction) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(interaction.channelId)) return;
+        if (!isPerm3OrAdmin(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const guild = interaction.guild;
 
         const totalMembers = guild.memberCount;
@@ -51,6 +56,11 @@ module.exports = {
     },
 
     async executeMessage(message) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(message.channel.id)) return;
+        if (!isPerm3OrAdmin(message.member)) {
+            return message.reply('non ta pas la perm');
+        }
         const guild = message.guild;
 
         const totalMembers = guild.memberCount;

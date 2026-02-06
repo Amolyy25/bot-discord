@@ -10,6 +10,12 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
+        const { isBoosterOrPerm2, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(interaction.channelId)) return;
+        if (!isBoosterOrPerm2(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
+
         const user = interaction.options.getUser('utilisateur') || interaction.user;
         const member = await interaction.guild.members.fetch(user.id);
 
@@ -47,6 +53,12 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
+        const { isBoosterOrPerm2, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(message.channel.id)) return;
+        if (!isBoosterOrPerm2(message.member)) {
+            return message.reply('non ta pas la perm');
+        }
+
         let user = message.mentions.users.first();
         
         if (!user && args[0]) {

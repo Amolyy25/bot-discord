@@ -21,6 +21,11 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
+        const { isStaffTest, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(interaction.channelId)) return;
+        if (!isStaffTest(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const userStr = interaction.options.getString('utilisateur');
         let userId;
 
@@ -73,6 +78,11 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
+        const { isStaffTest, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(message.channel.id)) return;
+        if (!isStaffTest(message.member)) {
+            return message.reply('non ta pas la perm');
+        }
         let userId;
         if (args[0]) {
             const mentionMatch = args[0].match(/^<@!?(\d+)>$/);

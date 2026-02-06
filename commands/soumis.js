@@ -12,6 +12,11 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(interaction.channelId)) return;
+        if (!isPerm3OrAdmin(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
@@ -48,6 +53,14 @@ module.exports = {
             // Ajouter le rôle soumis
             await member.roles.add(role);
             
+            const { logModAction } = require('./utils/logHelper');
+            await logModAction(interaction.guild, {
+                action: 'SOUMIS',
+                moderator: interaction.user,
+                target: target,
+                color: 0x010101
+            });
+            
             await interaction.reply({ content: `${target} a été soumis par **${interaction.user.tag}** !` });
         } catch (error) {
             console.error(error);
@@ -56,8 +69,10 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-            return message.reply('Vous n\'avez pas la permission d\'utiliser cette commande!');
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(message.channel.id)) return;
+        if (!isPerm3OrAdmin(message.member)) {
+            return message.reply('non ta pas la perm');
         }
 
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
@@ -93,6 +108,15 @@ module.exports = {
             }
 
             await member.roles.add(role);
+
+            const { logModAction } = require('./utils/logHelper');
+            await logModAction(message.guild, {
+                action: 'SOUMIS',
+                moderator: message.author,
+                target: target,
+                color: 0x010101
+            });
+
             await message.channel.send({ content: `${target} a été soumis par **${message.author.tag}** !` });
         } catch (error) {
             console.error(error);

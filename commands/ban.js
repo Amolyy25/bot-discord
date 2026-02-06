@@ -12,6 +12,11 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        const { isStaff, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(interaction.channelId)) return;
+        if (!isStaff(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
@@ -27,8 +32,10 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) {
-            return message.reply('Vous n\'avez pas la permission de modérer les membres!');
+        const { isStaff, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(message.channel.id)) return;
+        if (!isStaff(message.member)) {
+            return message.reply('non ta pas la perm');
         }
 
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
@@ -130,6 +137,16 @@ async function startInteractiveBan(context, target, member) {
             try {
                 await i.guild.bans.create(target.id, { reason: `Ban par ${user.tag} - ${selections.gravityLabel}` });
                 addSanction(i.guild.id, target.id, 'ban', selections.level, user.tag, null, selections.category, selections.gravityLabel, 'permanent');
+
+                const { logModAction } = require('./utils/logHelper');
+                await logModAction(i.guild, {
+                    action: 'BAN',
+                    moderator: user,
+                    target: target,
+                    reason: selections.gravityLabel,
+                    details: `Catégorie: ${selections.category}`,
+                    color: 0xFF0000
+                });
 
                 const finalEmbed = {
                     color: 0xFF0000,

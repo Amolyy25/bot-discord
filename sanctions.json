@@ -60,5 +60,31 @@
         "expiresAt": "2026-02-05T18:56:24.448Z"
       }
     ]
+  },
+  "1469071689399926786": {
+    "1172869002670903422": [
+      {
+        "type": "tempmute",
+        "level": "2",
+        "moderator": "lunacy07",
+        "reason": "Spam intensif",
+        "category": "Spam",
+        "gravity": "Spam intensif",
+        "duration": "30m",
+        "timestamp": "2026-02-06T09:15:43.922Z",
+        "expiresAt": "2026-02-06T09:45:43.922Z"
+      },
+      {
+        "type": "mute",
+        "level": "1",
+        "moderator": "amolyy_",
+        "reason": "Propos choquant",
+        "category": "Propos déplacés",
+        "gravity": "Propos choquant",
+        "duration": "permanent",
+        "timestamp": "2026-02-06T09:19:49.082Z",
+        "expiresAt": null
+      }
+    ]
   }
 }

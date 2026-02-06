@@ -12,6 +12,11 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        const { isStaff, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(interaction.channelId)) return;
+        if (!isStaff(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
@@ -24,8 +29,10 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-            return message.reply('Vous n\'avez pas la permission de modérer les membres!');
+        const { isStaff, isModChannel } = require('./utils/permHelper');
+        if (!isModChannel(message.channel.id)) return;
+        if (!isStaff(message.member)) {
+            return message.reply('non ta pas la perm');
         }
 
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
@@ -125,6 +132,16 @@ async function startInteractiveWarn(context, target, member) {
         } else if (i.customId === 'confirm_warn') {
             try {
                 addSanction(i.guild.id, target.id, 'warn', selections.level, user.tag, null, selections.category, selections.gravityLabel);
+
+                const { logModAction } = require('./utils/logHelper');
+                await logModAction(i.guild, {
+                    action: 'WARN',
+                    moderator: user,
+                    target: target,
+                    reason: selections.gravityLabel,
+                    details: `Catégorie: ${selections.category}`,
+                    color: 0xFFFF00
+                });
 
                 const finalEmbed = {
                     color: 0xFFFF00,

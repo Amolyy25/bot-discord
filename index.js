@@ -5,12 +5,22 @@ require('dotenv').config();
 const http = require('http');
 
 // Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
-const PORT = process.env.PORT || 8000;
-http.createServer((req, res) => {
+const PORT = process.env.PORT || 8080;
+const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.write('Bot is alive!');
     res.end();
-}).listen(PORT, () => {
+});
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.warn(`Le port ${PORT} est déjà utilisé. Le Health Check ne pourra pas démarrer sur ce port.`);
+    } else {
+        console.error('Erreur du serveur Health Check:', err);
+    }
+});
+
+server.listen(PORT, () => {
     console.log(`Port ${PORT} ouvert pour le Health Check`);
 });
 

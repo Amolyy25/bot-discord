@@ -6,6 +6,11 @@ module.exports = {
         .setDescription('Affiche la liste des commandes du bot'),
 
     async execute(interaction) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(interaction.channelId)) return;
+        if (!isPerm3OrAdmin(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const embed = {
             color: 0x5865F2,
             title: 'Liste des Commandes',
@@ -13,7 +18,7 @@ module.exports = {
             fields: [
                 {
                     name: 'Utilitaires',
-                    value: '`-snipe` | `/snipe` - Message supprimé\n`-pic` | `/pic` - Photo de profil\n`-fake` | `/fake` - Détecter les fakes (Screen Google)\n`-userinfo` | `/userinfo` - Infos utilisateur\n`-serverinfo` | `/serverinfo` - Infos serveur\n`-roleinfo` | `/roleinfo` - Infos rôle\n`-ping` | `/ping` - Latence',
+                    value: '`-snipe` | `/snipe` - Message supprimé\n`-pic` | `/pic` - Photo de profil\n`-fake` | `/fake` - Détecter les fakes (Screen Google)\n`-userinfo` | `/userinfo` - Infos utilisateur\n`-serverinfo` | `/serverinfo` - Infos serveur\n`-roleinfo` | `/roleinfo` - Infos rôle\n`-ping` | `/ping` - Latence\n`-stats` | `/stats` - Statistiques serveur',
                     inline: false
                 },
                 {
@@ -52,6 +57,11 @@ module.exports = {
     },
 
     async executeMessage(message) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(message.channel.id)) return;
+        if (!isPerm3OrAdmin(message.member)) {
+            return message.reply('non ta pas la perm');
+        }
         const embed = {
             color: 0x5865F2,
             title: 'Liste des Commandes',
@@ -59,7 +69,7 @@ module.exports = {
             fields: [
                 {
                     name: 'Utilitaires',
-                    value: '`-snipe` | `/snipe` - Message supprimé\n`-pic` | `/pic` - Photo de profil\n`-fake` | `/fake` - Détecter les fakes (Screen Google)\n`-userinfo` | `/userinfo` - Infos utilisateur\n`-serverinfo` | `/serverinfo` - Infos serveur\n`-roleinfo` | `/roleinfo` - Infos rôle\n`-ping` | `/ping` - Latence',
+                    value: '`-snipe` | `/snipe` - Message supprimé\n`-pic` | `/pic` - Photo de profil\n`-fake` | `/fake` - Détecter les fakes (Screen Google)\n`-userinfo` | `/userinfo` - Infos utilisateur\n`-serverinfo` | `/serverinfo` - Infos serveur\n`-roleinfo` | `/roleinfo` - Infos rôle\n`-ping` | `/ping` - Latence\n`-stats` | `/stats` - Statistiques serveur',
                     inline: false
                 },
                 {

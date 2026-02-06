@@ -14,11 +14,21 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
+        const { isBoosterOrPerm2, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(interaction.channelId)) return;
+        if (!isBoosterOrPerm2(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const target = interaction.options.getUser('utilisateur');
         await this.handleFakeCheck(interaction, target);
     },
 
     async executeMessage(message, args) {
+        const { isBoosterOrPerm2, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(message.channel.id)) return;
+        if (!isBoosterOrPerm2(message.member)) {
+            return message.reply('non ta pas la perm');
+        }
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
         if (!target) return message.reply('Usage: -fake @utilisateur ou ID');
         await this.handleFakeCheck(message, target);

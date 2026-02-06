@@ -6,6 +6,11 @@ module.exports = {
         .setDescription('Affiche le dernier message supprimé'),
 
     async execute(interaction, client, snipes) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(interaction.channelId)) return;
+        if (!isPerm3OrAdmin(interaction.member)) {
+            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+        }
         const snipe = snipes.get(interaction.channelId);
 
         if (!snipe) {
@@ -37,6 +42,11 @@ module.exports = {
     },
 
     async executeMessage(message, args, client, snipes) {
+        const { isPerm3OrAdmin, isModChannel } = require('./utils/permHelper');
+        if (isModChannel(message.channel.id)) return;
+        if (!isPerm3OrAdmin(message.member)) {
+            return message.reply('non ta pas la perm');
+        }
         const snipe = snipes.get(message.channel.id);
 
         if (!snipe) {
