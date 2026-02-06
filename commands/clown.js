@@ -14,7 +14,7 @@ module.exports = {
         // Bypass admin, sinon pas dans le salon modé
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
         
-        if (!isBoosterOrPerm2(interaction.member)) {
+        if (!isBoosterOrPerm2(interaction.member) && !interaction.member.roles.cache.has('1469071689399926791')) {
             return interaction.reply({ content: 'non ta pas la perm (Booster minimum)', ephemeral: true });
         }
 
@@ -26,7 +26,7 @@ module.exports = {
         const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
 
-        if (!isBoosterOrPerm2(message.member)) {
+        if (!isBoosterOrPerm2(message.member) && !message.member.roles.cache.has('1469071689399926791')) {
             return message.reply('non ta pas la perm (Booster minimum)');
         }
 
