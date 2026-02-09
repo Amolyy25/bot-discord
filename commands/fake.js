@@ -15,9 +15,13 @@ module.exports = {
 
     async execute(interaction) {
         const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
-        const adminStatus = isAdmin(interaction.member);
+        const currentMember = interaction.member;
+        const allowedRole = '1470487259315835052';
+        const adminStatus = isAdmin(currentMember);
+
         if (isModChannel(interaction.channelId) && !adminStatus) return;
-        if (!isBoosterOrPerm2(interaction.member)) {
+        
+        if (!isBoosterOrPerm2(currentMember) && !currentMember.roles.cache.has(allowedRole)) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
         const target = interaction.options.getUser('utilisateur');
@@ -27,12 +31,32 @@ module.exports = {
     async executeMessage(message, args) {
         const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(message.member);
+        const allowedRole = '1470487259315835052';
+
         if (isModChannel(message.channel.id) && !adminStatus) return;
-        if (!isBoosterOrPerm2(message.member)) {
+        
+        if (!isBoosterOrPerm2(message.member) && !message.member.roles.cache.has(allowedRole)) {
             return message.reply('non ta pas la perm');
         }
-        const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
-        if (!target) return message.reply('Usage: -fake @utilisateur ou ID');
+
+        let target;
+        if (message.reference) {
+            try {
+                const repliedMessage = await message.channel.messages.fetch(message.reference.messageId);
+                target = repliedMessage.author;
+            } catch (error) {
+                console.error('Error fetching replied message:', error);
+            }
+        }
+
+        if (!target) {
+            target = message.mentions.users.first();
+            if (!target && args[0]) {
+                target = await message.client.users.fetch(args[0]).catch(() => null);
+            }
+        }
+
+        if (!target) return message.reply('Usage: -fake @utilisateur ou ID (ou répondez à un message)');
         await this.handleFakeCheck(message, target);
     },
 
