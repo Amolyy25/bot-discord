@@ -142,6 +142,25 @@ async function startInteractiveMute(context, target, member) {
         } else if (i.customId === 'confirm_mute') {
             const durationMs = parseDuration(selections.duration);
             try {
+                // Envoi du MP à l'utilisateur
+                try {
+                    await target.send({
+                        embeds: [{
+                            color: 0xFFA500,
+                            title: 'Sanction : Mute Temporaire',
+                            description: `Vous avez été rendu muet sur **${i.guild.name}**.`,
+                            fields: [
+                                { name: 'Raison', value: selections.gravityLabel, inline: true },
+                                { name: 'Modérateur', value: user.tag, inline: true },
+                                { name: 'Durée', value: selections.duration, inline: true }
+                            ],
+                            timestamp: new Date()
+                        }]
+                    });
+                } catch (err) {
+                    console.log(`Impossible d'envoyer un MP à ${target.tag}`);
+                }
+
                 // Timeout
                 await member.timeout(durationMs, `Mute par ${user.tag} - ${selections.gravityLabel}`);
                 

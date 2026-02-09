@@ -16,13 +16,13 @@ const INFRACTION_CONFIG = {
     },
     'Insulte': {
         '1': { label: 'Langage familier', duration: '10m' },
-        '2': { label: 'Insulte directe', duration: '1h' },
-        '3': { label: 'Insulte grave / Harcèlement', duration: '1d' }
+        '2': { label: 'Insulte directe', duration: '20m' },
+        '3': { label: 'Insulte grave / Harcèlement', duration: '1h' }
     },
     'Propos déplacés': {
         '1': { label: 'Propos choquant', duration: '15m' },
         '2': { label: 'Propos dérangeant', duration: '20m' },
-        '3': { label: 'Propos à caractère sexuelle, mysogine etc', duration: '6h' }
+        '3': { label: 'Propos à caractère sexuelle, mysogine etc', duration: '30m' }
     },
     'Autre': {
         '1': { label: 'Infraction mineure', duration: '5m' },
