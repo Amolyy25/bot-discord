@@ -2,12 +2,18 @@ const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+
+if (!process.env.TOKEN || !process.env.CLIENT_ID) {
+    console.error('Erreur: TOKEN et/ou CLIENT_ID manquants. Vérifiez le fichier .env ou les variables d\'environnement.');
+    process.exit(1);
+}
+
 const http = require('http');
 const cron = require('node-cron');
 const statsCommand = require('./commands/stats.js');
 const antispam = require('./commands/utils/antispamHelper');
 
-// Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
+// Petit serveur HTTP pour le Health Check (port 8080 par défaut ou celui de l'hébergeur)
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -23,9 +29,13 @@ server.on('error', (err) => {
     }
 });
 
-server.listen(PORT, () => {
-    console.log(`Port ${PORT} ouvert pour le Health Check`);
-});
+try {
+    server.listen(PORT, () => {
+        console.log(`Port ${PORT} ouvert pour le Health Check`);
+    });
+} catch (err) {
+    console.warn('Impossible de démarrer le serveur Health Check:', err.message);
+}
 
 const client = new Client({
     intents: [
@@ -217,4 +227,7 @@ client.once('ready', () => {
     });
 });
 
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN).catch((err) => {
+    console.error('Connexion Discord échouée:', err.message || err);
+    process.exit(1);
+});
