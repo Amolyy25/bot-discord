@@ -1,19 +1,13 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
-
-if (!process.env.TOKEN || !process.env.CLIENT_ID) {
-    console.error('Erreur: TOKEN et/ou CLIENT_ID manquants. Vérifiez le fichier .env ou les variables d\'environnement.');
-    process.exit(1);
-}
-
 const http = require('http');
 const cron = require('node-cron');
 const statsCommand = require('./commands/stats.js');
 const antispam = require('./commands/utils/antispamHelper');
 
-// Petit serveur HTTP pour le Health Check (port 8080 par défaut ou celui de l'hébergeur)
+// Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -29,13 +23,9 @@ server.on('error', (err) => {
     }
 });
 
-try {
-    server.listen(PORT, () => {
-        console.log(`Port ${PORT} ouvert pour le Health Check`);
-    });
-} catch (err) {
-    console.warn('Impossible de démarrer le serveur Health Check:', err.message);
-}
+server.listen(PORT, () => {
+    console.log(`Port ${PORT} ouvert pour le Health Check`);
+});
 
 const client = new Client({
     intents: [
@@ -181,7 +171,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
 });
 
-client.once(Events.ClientReady, () => {
+client.once('ready', () => {
     console.log(`Connecté en tant que ${client.user.tag}`);
 
     // Initialiser l'anti-spam
@@ -227,7 +217,4 @@ client.once(Events.ClientReady, () => {
     });
 });
 
-client.login(process.env.TOKEN).catch((err) => {
-    console.error('Connexion Discord échouée:', err.message || err);
-    process.exit(1);
-});
+client.login(process.env.TOKEN);
