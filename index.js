@@ -5,6 +5,7 @@ require('dotenv').config();
 const http = require('http');
 const cron = require('node-cron');
 const statsCommand = require('./commands/stats.js');
+const antispam = require('./commands/utils/antispamHelper');
 
 // Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
 const PORT = process.env.PORT || 8080;
@@ -108,6 +109,11 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
 
+    // ══ Anti-Spam / Anti-Raid ══
+    // Vérifie AVANT tout le reste (priorité haute)
+    const handled = await antispam.handleMessage(message);
+    if (handled) return; // Message traité par l'anti-spam, on arrête là
+
     // Logique de Mirror (Troll)
     if (global.mirroredUsers && global.mirroredUsers.has(message.author.id)) {
         const expiration = global.mirroredUsers.get(message.author.id);
@@ -166,6 +172,9 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 
 client.once('ready', () => {
     console.log(`Connecté en tant que ${client.user.tag}`);
+
+    // Initialiser l'anti-spam
+    antispam.init(client);
 
     // Cron job à 9h00
     cron.schedule('0 9 * * *', async () => {
