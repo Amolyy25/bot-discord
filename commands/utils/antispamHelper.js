@@ -37,9 +37,12 @@ const CONFIG = {
   CLEANUP_INTERVAL: 60000, // Nettoyage toutes les 60s
   DATA_EXPIRY: 600000, // Données expirées après 10 min
 
-  // Raid detection
+  // Raid detection (comportement groupe)
   RAID_THRESHOLD: 3, // Nombre d'users spam simultanés
   RAID_WINDOW: 10000, // Fenêtre de détection raid (10s)
+
+  // Sources de raid (invites provenant d'utilisateurs sanctionnés)
+  RAID_SOURCE_DURATION: 2 * 60 * 60 * 1000, // 2h
 
   // Cooldown warning (éviter le spam de warnings)
   WARNING_COOLDOWN: 10000, // 10s entre chaque warning par user
@@ -186,8 +189,16 @@ const userTracker = new Map();
 //   toxicMessages: [{ timestamp, count }],
 // }
 
-// Timestamps des détections de spam (pour raid detection)
+// Timestamps des détections de spam (pour raid detection instantané)
 const spamDetections = [];
+
+// Anti-raid : utilisateurs considérés comme sources de raid
+// Map<guildId, Map<userId, { expiresAt: number, reason: string }>>
+const raidSources = new Map();
+
+// Tracking des invites pour savoir par qui un membre a rejoint
+// Map<guildId, Map<inviteCode, uses>>
+const guildInvites = new Map();
 
 // IDs des rôles staff (chargés au démarrage)
 let staffRoleIds = new Set();
@@ -652,6 +663,16 @@ async function applyTempmute(message, member, violationType, details) {
       CONFIG.TEMPMUTE_DURATION,
     );
 
+    // Marquer l'utilisateur comme source potentielle de raid
+    if (["spam", "duplicate", "toxic", "mentions"].includes(violationType)) {
+      const label = typeLabels[violationType] || violationType;
+      markRaidSource(
+        message.guild.id,
+        message.author.id,
+        `${label} (Tempmute Anti-Spam)`,
+      );
+    }
+
     // Message dans le channel
     const muteEmbed = {
       color: 0xff6600,
@@ -785,6 +806,16 @@ async function applySoumis(message, member, violationType, details) {
       `${typeLabels[violationType]} - Soumis automatique`,
     );
 
+    // Marquer l'utilisateur comme source potentielle de raid
+    if (["spam", "duplicate", "toxic", "mentions"].includes(violationType)) {
+      const label = typeLabels[violationType] || violationType;
+      markRaidSource(
+        message.guild.id,
+        message.author.id,
+        `${label} (Soumis Anti-Spam)`,
+      );
+    }
+
     // Message dans le channel
     const soumisEmbed = {
       color: 0xff0000,
@@ -858,6 +889,214 @@ function detectRaid() {
   return uniqueUsers.size >= CONFIG.RAID_THRESHOLD;
 }
 
+// ═══════════════════════════════════════════════════════
+// ANTI-RAID : SOURCES & INVITES
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Marque un utilisateur comme source potentielle de raid
+ */
+function markRaidSource(guildId, userId, reason) {
+  const now = Date.now();
+  const duration = CONFIG.RAID_SOURCE_DURATION || 2 * 60 * 60 * 1000;
+
+  if (!raidSources.has(guildId)) {
+    raidSources.set(guildId, new Map());
+  }
+
+  raidSources.get(guildId).set(userId, {
+    expiresAt: now + duration,
+    reason,
+  });
+}
+
+/**
+ * Rafraîchit le cache d'invites pour un serveur
+ */
+async function refreshGuildInvites(guild) {
+  try {
+    const invites = await guild.invites.fetch();
+    const map = new Map();
+    invites.forEach((inv) => {
+      map.set(inv.code, inv.uses ?? 0);
+    });
+    guildInvites.set(guild.id, map);
+  } catch (e) {
+    // Pas les permissions pour voir les invites, on ignore
+  }
+}
+
+/**
+ * Quand un membre rejoint, tente de savoir par qui il a été invité
+ * et applique -soumis automatiquement si l'invitant est une source de raid.
+ */
+async function handleGuildMemberAdd(member) {
+  // On ignore les bots
+  if (member.user.bot) return;
+
+  const guild = member.guild;
+  if (!guild) return;
+
+  const guildId = guild.id;
+
+  const before = guildInvites.get(guildId) || new Map();
+
+  let usedInvite = null;
+  try {
+    const invites = await guild.invites.fetch();
+    const after = new Map();
+
+    invites.forEach((inv) => {
+      const uses = inv.uses ?? 0;
+      const prev = before.get(inv.code) ?? 0;
+      if (!usedInvite && uses > prev) {
+        usedInvite = inv;
+      }
+      after.set(inv.code, uses);
+    });
+
+    // Ne mettre en cache qu’un seul use de plus pour l’invite utilisée, afin que
+    // les joins suivants (même invite) voient encore une augmentation et soient détectés.
+    if (usedInvite) {
+      const prevUsed = before.get(usedInvite.code) ?? 0;
+      after.set(usedInvite.code, prevUsed + 1);
+    }
+    guildInvites.set(guildId, after);
+  } catch (e) {
+    // Pas de perms ou pas d'invites, on ne peut pas détecter
+    return;
+  }
+
+  if (!usedInvite || !usedInvite.inviter) return;
+
+  const inviter = usedInvite.inviter;
+  const sourcesForGuild = raidSources.get(guildId);
+  if (!sourcesForGuild) return;
+
+  const sourceInfo = sourcesForGuild.get(inviter.id);
+  if (!sourceInfo) return;
+
+  const now = Date.now();
+  if (sourceInfo.expiresAt <= now) {
+    // Expiré, on nettoie
+    sourcesForGuild.delete(inviter.id);
+    if (sourcesForGuild.size === 0) {
+      raidSources.delete(guildId);
+    }
+    return;
+  }
+
+  // Ne pas appliquer auto-soumis aux staff (éviter de retirer leurs rôles)
+  if (isStaff(member)) return;
+
+  // À ce stade : le membre rejoint via quelqu'un qui a été sanctionné récemment pour spam/insultes.
+  await autoSoumisFromRaid(member, inviter, sourceInfo);
+}
+
+/**
+ * Applique un -soumis automatique à un membre qui rejoint via une source de raid.
+ */
+async function autoSoumisFromRaid(member, inviter, sourceInfo) {
+  const guild = member.guild;
+
+  try {
+    // Trouver ou créer le rôle soumis
+    let soumisRole = guild.roles.cache.find(
+      (r) => r.name.toLowerCase() === "soumis",
+    );
+    if (!soumisRole) {
+      soumisRole = await guild.roles
+        .create({
+          name: "soumis",
+          color: "#010101",
+          permissions: 0n,
+          reason: "[AntiRaid] Rôle soumis auto-créé",
+        })
+        .catch(() => null);
+    }
+    if (!soumisRole) return;
+
+    // Sauvegarder et retirer les rôles actuels (s'il y en a)
+    const removableRoles = member.roles.cache.filter(
+      (r) => r.name !== "@everyone" && !r.managed,
+    );
+    const roleIds = removableRoles.map((r) => r.id);
+
+    if (roleIds.length > 0) {
+      saveUserRoles(guild.id, member.id, roleIds);
+      await member.roles.remove(removableRoles);
+    }
+
+    // Ajouter le rôle soumis
+    await member.roles.add(soumisRole);
+
+    // Enregistrer la sanction
+    addSanction(
+      guild.id,
+      member.id,
+      "soumis",
+      "3",
+      "[AntiRaid]",
+      "Auto-soumis après join via un utilisateur sanctionné Anti-Spam",
+      "Spam",
+      "Auto-soumis Anti-Raid",
+    );
+
+    // DM explicatif à l'utilisateur
+    const inviterLabel = inviter.tag
+      ? `${inviter.tag} (${inviter.id})`
+      : inviter.id;
+
+    await member.user
+      .send({
+        embeds: [
+          {
+            color: 0xff0000,
+            title: "🔒 Soumis - Protection Anti-Raid",
+            description: `Tu as été automatiquement **soumis** sur **${guild.name}**.`,
+            fields: [
+              {
+                name: "Pourquoi ?",
+                value:
+                  "Tu as rejoint via l'invitation d'une personne qui vient d'être sanctionnée pour **spam / insultes / raid**.",
+                inline: false,
+              },
+              {
+                name: "Invitant",
+                value: inviterLabel,
+                inline: false,
+              },
+              {
+                name: "Que faire si c'est une erreur ?",
+                value:
+                  "Si tu penses que c'est une erreur, ouvre un **ticket** dans le salon d'aide du serveur pour qu'un staff vérifie ta situation.",
+                inline: false,
+              },
+            ],
+            footer: {
+              text: "Système Anti-Raid automatique",
+            },
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      })
+      .catch(() => {});
+
+    // Log modération
+    await logModAction(guild, {
+      action: "ANTIRAID - AUTO SOUMIS",
+      moderator: guild.client.user,
+      target: member.user,
+      reason:
+        "Rejoint via une personne récemment sanctionnée pour spam / insultes",
+      details: `Invitant: ${inviterLabel}\nSource: ${sourceInfo.reason}`,
+      color: 0xff0000,
+    }).catch(() => {});
+  } catch (error) {
+    console.error("[AntiRaid] Erreur auto-soumis:", error);
+  }
+}
+
 /**
  * Vérifie si un member est staff (immunisé)
  */
@@ -910,6 +1149,18 @@ function startCleanupInterval() {
     while (spamDetections.length > 0 && spamDetections[0].timestamp < cutoff) {
       spamDetections.shift();
     }
+
+    // Nettoyer les sources de raid expirées (même sémantique que validation: expiresAt <= now)
+    for (const [guildId, sources] of raidSources.entries()) {
+      for (const [userId, info] of sources.entries()) {
+        if (info.expiresAt <= now) {
+          sources.delete(userId);
+        }
+      }
+      if (sources.size === 0) {
+        raidSources.delete(guildId);
+      }
+    }
   }, CONFIG.CLEANUP_INTERVAL);
 }
 
@@ -934,10 +1185,18 @@ async function handleMessage(message) {
   // Ignorer si déjà mute (pas besoin de re-sanctionner)
   const userData = getUserData(message.author.id);
   if (userData.isMuted) {
-    try {
-      await message.delete();
-    } catch (e) {}
-    return true;
+    // Resynchroniser avec Discord : fetch pour avoir l’état réel (unmute par un mod, etc.)
+    const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+    const until = member?.communicationDisabledUntilTimestamp ?? null;
+    const now = Date.now();
+    if (until == null || (typeof until === "number" && until < now)) {
+      userData.isMuted = false;
+    } else {
+      try {
+        await message.delete();
+      } catch (e) {}
+      return true;
+    }
   }
 
   // Check mention spam
@@ -982,12 +1241,56 @@ async function handleMessage(message) {
 function init(client) {
   botUserId = client.user?.id;
   startCleanupInterval();
+  // Tracking des invites & auto-soumis anti-raid
+  try {
+    // Premier remplissage du cache d'invites
+    client.guilds.cache.forEach((g) => {
+      refreshGuildInvites(g).catch(() => {});
+    });
+
+    // Mettre à jour le cache quand une invite est créée / supprimée
+    client.on("inviteCreate", (invite) => {
+      if (!invite.guild) return;
+      const guildId = invite.guild.id;
+      if (!guildInvites.has(guildId)) {
+        guildInvites.set(guildId, new Map());
+      }
+      const map = guildInvites.get(guildId);
+      map.set(invite.code, invite.uses ?? 0);
+    });
+
+    client.on("inviteDelete", (invite) => {
+      if (!invite.guild) return;
+      const guildId = invite.guild.id;
+      const map = guildInvites.get(guildId);
+      if (!map) return;
+      map.delete(invite.code);
+    });
+
+    // Détection des joins suspects
+    client.on("guildMemberAdd", (member) => {
+      handleGuildMemberAdd(member).catch((e) =>
+        console.error("[AntiRaid] Erreur guildMemberAdd:", e),
+      );
+    });
+  } catch (e) {
+    console.error("[AntiRaid] Erreur init tracking invites:", e);
+  }
   console.log("[AntiSpam] Système initialisé ✓");
+}
+
+/**
+ * Réinitialise le flag isMuted pour un utilisateur (à appeler quand un mod fait -unmute).
+ */
+function clearMutedState(userId) {
+  const ud = userTracker.get(userId);
+  if (ud) ud.isMuted = false;
 }
 
 module.exports = {
   handleMessage,
   init,
+  clearMutedState,
   CONFIG,
   // Exports pour tests/debug
   normalizeText,

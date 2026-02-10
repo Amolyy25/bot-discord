@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { clearMutedState } = require('./utils/antispamHelper');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -31,6 +32,8 @@ module.exports = {
 
         try {
             await member.timeout(null, reason);
+
+            clearMutedState(target.id);
 
             const mutedRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
             if (mutedRole && member.roles.cache.has(mutedRole.id)) {
@@ -91,6 +94,8 @@ module.exports = {
 
         try {
             await member.timeout(null, reason);
+
+            clearMutedState(target.id);
 
             const mutedRole = message.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
             if (mutedRole && member.roles.cache.has(mutedRole.id)) {

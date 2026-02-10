@@ -46,6 +46,8 @@ module.exports = {
 
         const userSanctions = sanctions[guildId][userId];
 
+        const member = await interaction.guild.members.fetch(userId).catch(() => null);
+
         const gravityColors = {
             'Faible': 0x00FF00,
             'Moyenne': 0xFFA500,
@@ -57,12 +59,18 @@ module.exports = {
             let expiryText = '';
             if (sanction.expiresAt) {
                 const isExpired = new Date(sanction.expiresAt) < new Date();
-                expiryText = `\n${isExpired ? '[Expiré]' : '[Actif]'} Expire: <t:${Math.floor(new Date(sanction.expiresAt).getTime() / 1000)}:F>`;
+                let status = isExpired ? '[Expiré]' : '[Actif]';
+                if (sanction.type === 'tempmute' && member) {
+                    const until = member.communicationDisabledUntilTimestamp ?? null;
+                    const now = Date.now();
+                    if (until == null || (typeof until === 'number' && until < now)) {
+                        status = '[Levée]';
+                    }
+                }
+                expiryText = `\n${status} Expire: <t:${Math.floor(new Date(sanction.expiresAt).getTime() / 1000)}:F>`;
             }
             return `**${index + 1}. ${sanction.type.toUpperCase()}**\nCatégorie: ${sanction.category || 'N/A'}\nGravité: ${sanction.gravity || 'N/A'}${durationText}${expiryText}\nPar: ${sanction.moderator}\nRaison: ${sanction.reason}\nDate: <t:${Math.floor(new Date(sanction.timestamp).getTime() / 1000)}:F>`;
         }).join('\n\n─────────────\n\n');
-
-        const member = await interaction.guild.members.fetch(userId).catch(() => null);
         const userTag = member?.user?.tag || userId;
 
         const embed = {
@@ -102,17 +110,25 @@ module.exports = {
 
         const userSanctions = sanctions[guildId][userId];
 
+        const member = await message.guild.members.fetch(userId).catch(() => null);
+
         const sanctionList = userSanctions.map((sanction, index) => {
             let durationText = sanction.duration ? `\nDurée: ${sanction.duration}` : '';
             let expiryText = '';
             if (sanction.expiresAt) {
                 const isExpired = new Date(sanction.expiresAt) < new Date();
-                expiryText = `\n${isExpired ? '[Expiré]' : '[Actif]'} Expire: <t:${Math.floor(new Date(sanction.expiresAt).getTime() / 1000)}:F>`;
+                let status = isExpired ? '[Expiré]' : '[Actif]';
+                if (sanction.type === 'tempmute' && member) {
+                    const until = member.communicationDisabledUntilTimestamp ?? null;
+                    const now = Date.now();
+                    if (until == null || (typeof until === 'number' && until < now)) {
+                        status = '[Levée]';
+                    }
+                }
+                expiryText = `\n${status} Expire: <t:${Math.floor(new Date(sanction.expiresAt).getTime() / 1000)}:F>`;
             }
             return `**${index + 1}. ${sanction.type.toUpperCase()}**\nCatégorie: ${sanction.category || 'N/A'}\nGravité: ${sanction.gravity || 'N/A'}${durationText}${expiryText}\nPar: ${sanction.moderator}\nRaison: ${sanction.reason}\nDate: <t:${Math.floor(new Date(sanction.timestamp).getTime() / 1000)}:F>`;
         }).join('\n\n─────────────\n\n');
-
-        const member = await message.guild.members.fetch(userId).catch(() => null);
         const userTag = member?.user?.tag || userId;
 
         const embed = {
