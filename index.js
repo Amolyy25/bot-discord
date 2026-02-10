@@ -181,7 +181,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
 });
 
-client.once('ready', () => {
+client.once('clientReady', () => {
     console.log(`Connecté en tant que ${client.user.tag}`);
 
     // Initialiser l'anti-spam
