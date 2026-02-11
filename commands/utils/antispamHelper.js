@@ -9,7 +9,7 @@ const { logModAction } = require("./logHelper");
 const CONFIG = {
   // Seuils de spam (messages rapides)
   MESSAGE_LIMIT: 5, // Max messages autorisés
-  TIME_WINDOW: 5000, // Fenêtre de 5 secondes
+  TIME_WINDOW: 4000, // Fenêtre de 5 secondes
 
   // Messages dupliqués
   DUPLICATE_LIMIT: 3, // Même message répété X fois
@@ -18,20 +18,18 @@ const CONFIG = {
   // Mention spam
   MENTION_LIMIT: 5, // Max mentions par message
 
-  // Sanctions progressives
-  TEMPMUTE_DURATION: "20m", // Durée du tempmute (strike 2)
-
   // Gestion des gros mots
   TOXIC_WINDOW: 20000, // Fenêtre de 20 secondes pour compter les insultes
   TOXIC_THRESHOLD_WORDS: 5, // Nombre total d'insultes dans la fenêtre avant action
   TOXIC_THRESHOLD_MESSAGES: 3, // Nombre de messages insultants avant action
   TOXIC_WORDS_IN_MESSAGE_THRESHOLD: 4, // Insultes dans un seul message pour déclencher direct
 
-  // Avertissement soft pour le spam (sans strike)
-  SOFT_SPAM_WINDOW: 30000, // 30s entre deux avertissements "moin vite, détend toi"
+  // Reset du spam (silence pendant 2s)
+  SPAM_RESET_WINDOW: 2000,
 
-  // Decay des strikes
-  STRIKE_DECAY: 300000, // Reset après 5 min sans infraction
+  // Channel de logs et rôles à ping
+  LOG_CHANNEL_ID: "1469258215916175392",
+  PING_ROLES: ["1469071689848721510", "1469071689831940310"],
 
   // Nettoyage mémoire
   CLEANUP_INTERVAL: 60000, // Nettoyage toutes les 60s
@@ -41,11 +39,8 @@ const CONFIG = {
   RAID_THRESHOLD: 3, // Nombre d'users spam simultanés
   RAID_WINDOW: 10000, // Fenêtre de détection raid (10s)
 
-  // Sources de raid (invites provenant d'utilisateurs sanctionnés)
+  // Sources de raid (invites provenant d'utilisateurs suspectés)
   RAID_SOURCE_DURATION: 2 * 60 * 60 * 1000, // 2h
-
-  // Cooldown warning (éviter le spam de warnings)
-  WARNING_COOLDOWN: 10000, // 10s entre chaque warning par user
 };
 
 // ═══════════════════════════════════════════════════════
@@ -181,10 +176,10 @@ const SOFT_TOXIC = new Set(["merde", "con", "conne", "wesh", "chien", "porc"]);
 const userTracker = new Map();
 // Structure UserData: {
 //   messages: [{timestamp, content, channelId}],
-//   strikes: number,
-//   lastStrike: number (timestamp),
-//   lastWarning: number (timestamp),
-//   lastSoftWarning: number (timestamp),
+//   isSpamming: boolean,
+//   spamBuffer: [{content, timestamp, channelId}],
+//   spamTimer: NodeJS.Timeout | null,
+//   spamOccurrence: number,
 //   isMuted: boolean,
 //   toxicMessages: [{ timestamp, count }],
 // }
@@ -321,10 +316,10 @@ function getUserData(userId) {
   if (!userTracker.has(userId)) {
     userTracker.set(userId, {
       messages: [],
-      strikes: 0,
-      lastStrike: 0,
-      lastWarning: 0,
-      lastSoftWarning: 0,
+      isSpamming: false,
+      spamBuffer: [],
+      spamTimer: null,
+      spamOccurrence: 0,
       isMuted: false,
       toxicMessages: [],
     });
@@ -339,11 +334,6 @@ function getUserData(userId) {
 function trackMessage(userId, content, channelId) {
   const now = Date.now();
   const userData = getUserData(userId);
-
-  // Decay des strikes si pas d'infraction depuis longtemps
-  if (userData.strikes > 0 && now - userData.lastStrike > CONFIG.STRIKE_DECAY) {
-    userData.strikes = 0;
-  }
 
   // Ajouter le message
   userData.messages.push({
@@ -392,8 +382,7 @@ function trackMessage(userId, content, channelId) {
   if (toxicResult.toxic) {
     // 3.a) Si le message est bourré d'insultes à lui seul -> direct
     if (
-      toxicResult.words.length >=
-      (CONFIG.TOXIC_WORDS_IN_MESSAGE_THRESHOLD || 4)
+      toxicResult.words.length >= (CONFIG.TOXIC_WORDS_IN_MESSAGE_THRESHOLD || 4)
     ) {
       return {
         violation: true,
@@ -460,394 +449,122 @@ function checkMentionSpam(message) {
 // ═══════════════════════════════════════════════════════
 
 /**
- * Applique la sanction appropriée selon le nombre de strikes
+ * Gère un message envoyé alors que l'utilisateur est déjà en état de spam.
+ */
+async function handleOngoingSpam(message, userData) {
+  // Supprimer le message
+  try {
+    await message.delete();
+  } catch (e) {}
+
+  // Ajouter au buffer
+  userData.spamBuffer.push({
+    content: message.content,
+    timestamp: Date.now(),
+    channelId: message.channel.id,
+  });
+
+  // Reset le timer de 2 secondes
+  if (userData.spamTimer) clearTimeout(userData.spamTimer);
+  userData.spamTimer = setTimeout(
+    () => finalizeSpamBurst(message.guild, message.author.id),
+    CONFIG.SPAM_RESET_WINDOW,
+  );
+}
+
+/**
+ * Finalise une rafale de spam : envoie les logs et reset l'état.
+ */
+async function finalizeSpamBurst(guild, userId) {
+  const userData = userTracker.get(userId);
+  if (!userData || !userData.isSpamming) return;
+
+  const buffer = userData.spamBuffer;
+  if (buffer.length === 0) {
+    userData.isSpamming = false;
+    return;
+  }
+
+  const logChannel = await guild.channels
+    .fetch(CONFIG.LOG_CHANNEL_ID)
+    .catch(() => null);
+  if (logChannel) {
+    const pings = CONFIG.PING_ROLES.map((r) => `<@&${r}>`).join(" ");
+    const count = buffer.length;
+    const channelId = buffer[0].channelId;
+    const occurrence = userData.spamOccurrence;
+
+    let messageList = buffer
+      .map(
+        (m) =>
+          `\`[${new Date(m.timestamp).toLocaleTimeString()}]\` ${m.content}`,
+      )
+      .join("\n");
+
+    // Tronquer si trop long pour un message Discord
+    if (messageList.length > 1800) {
+      messageList = messageList.substring(0, 1797) + "...";
+    }
+
+    const logMessage =
+      `${pings} **LOG DETECT SPAM**\n\n` +
+      `👤 **Utilisateur :** <@${userId}> (\`${userId}\`)\n` +
+      `🔢 **Nombre de messages supprimés :** ${count}\n` +
+      `📍 **Salon :** <#${channelId}>\n` +
+      `🔄 **Occurrence :** ${occurrence}${occurrence === 1 ? "ère" : "e"} fois\n\n` +
+      `📜 **Liste des messages :**\n${messageList}`;
+
+    await logChannel
+      .send(logMessage)
+      .catch((e) => console.error("[AntiSpam] Erreur log:", e));
+  }
+
+  // Reset
+  userData.isSpamming = false;
+  userData.spamBuffer = [];
+  userData.spamTimer = null;
+}
+
+/**
+ * Déclenche l'état de spam pour un utilisateur.
  */
 async function applySanction(message, violationType, details) {
   const userData = getUserData(message.author.id);
   const now = Date.now();
 
-  const isSpamLike =
-    violationType === "spam" ||
-    violationType === "duplicate" ||
-    violationType === "mentions";
+  // Si déjà en train de spammer, handleOngoingSpam s'en occupe déjà via handleMessage
+  if (userData.isSpamming) return;
 
-  // Étape soft pour le spam : on supprime + petit message, mais SANS strike
-  if (isSpamLike && userData.strikes === 0) {
-    const softWindow = CONFIG.SOFT_SPAM_WINDOW || 30000;
-    if (!userData.lastSoftWarning || now - userData.lastSoftWarning > softWindow) {
-      userData.lastSoftWarning = now;
+  // Marquer comme spamming
+  userData.isSpamming = true;
+  userData.spamOccurrence++;
 
-      try {
-        // Supprimer le message principal
-        await message.delete().catch(() => {});
-
-        // Supprimer quelques messages de spam récents du même user
-        if (violationType === "spam" || violationType === "duplicate") {
-          await bulkDeleteUserMessages(message.channel, message.author.id, 5);
-        }
-      } catch (e) {
-        // silencieux
-      }
-
-      // Message gentil dans le chat
-      await message.channel
-        .send(`${message.author} moin vite, détend toi`)
-        .catch(() => {});
-
-      // Pas de strike, pas de log lourd -> on sort
-      return;
-    }
-  }
-
-  // Éviter de spammer les warnings
-  if (
-    now - userData.lastWarning < CONFIG.WARNING_COOLDOWN &&
-    userData.strikes === userData._lastSanctionStrike
-  ) {
-    // Juste supprimer le message silencieusement
-    try {
-      await message.delete();
-    } catch (e) {}
-    return;
-  }
-
-  userData.strikes++;
-  userData.lastStrike = now;
-  userData.lastWarning = now;
-  userData._lastSanctionStrike = userData.strikes;
-
-  // Enregistrer la détection de spam pour la détection de raid
+  // Enregistrer la détection pour le raid
   spamDetections.push({ userId: message.author.id, timestamp: now });
 
-  const member = message.member;
-  if (!member) return;
+  // Message "moin vite, détend toi" (envoyé à chaque nouvelle détection de spam)
+  await message.channel
+    .send(`${message.author} moin vite, détend toi`)
+    .catch(() => {});
 
-  try {
-    // Toujours supprimer le message
-    await message.delete().catch(() => {});
+  // Traiter comme un message de spam continu (suppression + buffer + timer)
+  await handleOngoingSpam(message, userData);
 
-    // Essayer de supprimer les messages récents de spam aussi
-    if (violationType === "spam" || violationType === "duplicate") {
-      await bulkDeleteUserMessages(message.channel, message.author.id, 10);
-    }
+  // Marquer comme source de raid pour le tracking d'invites
+  markRaidSource(
+    message.guild.id,
+    message.author.id,
+    `${violationType} (Détection Anti-Spam)`,
+  );
 
-    if (userData.strikes === 1) {
-      // ══ STRIKE 1 : Warning ══
-      await applyWarning(message, violationType, details);
-    } else if (userData.strikes === 2) {
-      // ══ STRIKE 2 : Tempmute ══
-      await applyTempmute(message, member, violationType, details);
-    } else if (userData.strikes >= 3) {
-      // ══ STRIKE 3+ : Soumis ══
-      await applySoumis(message, member, violationType, details);
-      // Reset les strikes après soumis (sanction max atteinte)
-      userData.strikes = 0;
-    }
-  } catch (error) {
-    console.error("[AntiSpam] Erreur lors de la sanction:", error);
-  }
-}
-
-/**
- * Strike 1 : Warning - Supprime les messages + avertissement
- */
-async function applyWarning(message, violationType, details) {
-  const typeLabels = {
-    spam: "Spam de messages",
-    duplicate: "Messages dupliqués",
-    toxic: "Contenu inapproprié",
-    mentions: "Spam de mentions",
-  };
-
-  const warningEmbed = {
-    color: 0xffcc00,
-    title: "⚠️ Avertissement Anti-Spam",
-    description: `${message.author}, ton comportement a été détecté comme du **${typeLabels[violationType] || violationType}**.`,
-    fields: [
-      { name: "Détail", value: details || "N/A", inline: true },
-      { name: "Sanction", value: "Suppression des messages", inline: true },
-      { name: "Prochain", value: "⏱️ Tempmute si tu continues", inline: true },
-    ],
-    footer: { text: "Système Anti-Spam automatique" },
-    timestamp: new Date().toISOString(),
-  };
-
-  const warning = await message.channel
-    .send({ embeds: [warningEmbed] })
-    .catch(() => null);
-  if (warning) {
-    setTimeout(() => warning.delete().catch(() => {}), 10000);
-  }
-
-  // Log
+  // Log modération classique (optionnel mais on garde logModAction pour la trace)
   await logModAction(message.guild, {
-    action: "ANTISPAM - WARNING",
+    action: "ANTISPAM - DÉTECTION",
     moderator: message.client.user,
     target: message.author,
-    reason: `${typeLabels[violationType] || violationType} - ${details}`,
+    reason: `${violationType} - ${details}`,
     color: 0xffcc00,
   }).catch(() => {});
-}
-
-/**
- * Strike 2 : Tempmute - Timeout + rôle Muet
- */
-async function applyTempmute(message, member, violationType, details) {
-  const durationMs = parseDuration(CONFIG.TEMPMUTE_DURATION);
-  if (!durationMs) return;
-
-  const typeLabels = {
-    spam: "Spam de messages",
-    duplicate: "Messages dupliqués",
-    toxic: "Contenu inapproprié",
-    mentions: "Spam de mentions",
-  };
-
-  try {
-    // MP à l'utilisateur
-    await message.author
-      .send({
-        embeds: [
-          {
-            color: 0xff6600,
-            title: "🔇 Tempmute automatique",
-            description: `Tu as été mute sur **${message.guild.name}** par le système anti-spam.`,
-            fields: [
-              {
-                name: "Raison",
-                value: typeLabels[violationType] || violationType,
-                inline: true,
-              },
-              { name: "Durée", value: CONFIG.TEMPMUTE_DURATION, inline: true },
-              {
-                name: "Conseil",
-                value: "Calme-toi avant de revenir.",
-                inline: false,
-              },
-            ],
-            timestamp: new Date().toISOString(),
-          },
-        ],
-      })
-      .catch(() => {});
-
-    // Timeout Discord
-    await member.timeout(
-      durationMs,
-      `[AntiSpam] ${violationType} - ${details}`,
-    );
-
-    // Rôle Muet si existant
-    const mutedRole = message.guild.roles.cache.find(
-      (r) =>
-        r.name.toLowerCase() === "muet" || r.name.toLowerCase() === "muted",
-    );
-    if (mutedRole) {
-      await member.roles.add(mutedRole).catch(() => {});
-      setTimeout(
-        () => member.roles.remove(mutedRole).catch(() => {}),
-        durationMs,
-      );
-    }
-
-    // Enregistrer la sanction
-    addSanction(
-      message.guild.id,
-      message.author.id,
-      "tempmute",
-      "2",
-      "[AntiSpam]",
-      `${typeLabels[violationType]} - ${details}`,
-      "Spam",
-      typeLabels[violationType] || violationType,
-      CONFIG.TEMPMUTE_DURATION,
-    );
-
-    // Marquer l'utilisateur comme source potentielle de raid
-    if (["spam", "duplicate", "toxic", "mentions"].includes(violationType)) {
-      const label = typeLabels[violationType] || violationType;
-      markRaidSource(
-        message.guild.id,
-        message.author.id,
-        `${label} (Tempmute Anti-Spam)`,
-      );
-    }
-
-    // Message dans le channel
-    const muteEmbed = {
-      color: 0xff6600,
-      title: "🔇 Tempmute Anti-Spam",
-      description: `${message.author} a été **mute ${CONFIG.TEMPMUTE_DURATION}** par le système anti-spam.`,
-      fields: [
-        {
-          name: "Raison",
-          value: typeLabels[violationType] || violationType,
-          inline: true,
-        },
-        { name: "Durée", value: CONFIG.TEMPMUTE_DURATION, inline: true },
-        { name: "Prochain", value: "🔒 Soumis si ça continue", inline: true },
-      ],
-      footer: { text: "Système Anti-Spam automatique" },
-      timestamp: new Date().toISOString(),
-    };
-
-    const muteMsg = await message.channel
-      .send({ embeds: [muteEmbed] })
-      .catch(() => null);
-    if (muteMsg) {
-      setTimeout(() => muteMsg.delete().catch(() => {}), 15000);
-    }
-
-    // Log modération
-    await logModAction(message.guild, {
-      action: "ANTISPAM - TEMPMUTE",
-      moderator: message.client.user,
-      target: message.author,
-      reason: `${typeLabels[violationType] || violationType} - ${details}`,
-      details: `Durée: ${CONFIG.TEMPMUTE_DURATION}\nStrike: 2/3`,
-      color: 0xff6600,
-    }).catch(() => {});
-
-    getUserData(message.author.id).isMuted = true;
-    setTimeout(() => {
-      const ud = userTracker.get(message.author.id);
-      if (ud) ud.isMuted = false;
-    }, durationMs);
-  } catch (error) {
-    console.error("[AntiSpam] Erreur tempmute:", error);
-  }
-}
-
-/**
- * Strike 3 : Soumis - Retire tous les rôles + rôle Soumis
- */
-async function applySoumis(message, member, violationType, details) {
-  const typeLabels = {
-    spam: "Spam de messages",
-    duplicate: "Messages dupliqués",
-    toxic: "Contenu inapproprié",
-    mentions: "Spam de mentions",
-  };
-
-  try {
-    // Trouver ou créer le rôle soumis
-    let soumisRole = message.guild.roles.cache.find(
-      (r) => r.name.toLowerCase() === "soumis",
-    );
-    if (!soumisRole) {
-      soumisRole = await message.guild.roles
-        .create({
-          name: "soumis",
-          color: "#010101",
-          permissions: 0n,
-          reason: "[AntiSpam] Rôle soumis auto-créé",
-        })
-        .catch(() => null);
-    }
-    if (!soumisRole) return;
-
-    // MP à l'utilisateur
-    await message.author
-      .send({
-        embeds: [
-          {
-            color: 0xff0000,
-            title: "🔒 Soumis - Anti-Spam",
-            description: `Tu as été **soumis** sur **${message.guild.name}** par le système anti-spam.`,
-            fields: [
-              {
-                name: "Raison",
-                value: `${typeLabels[violationType] || violationType} répété`,
-                inline: true,
-              },
-              {
-                name: "Conséquence",
-                value: "Tous tes rôles ont été retirés",
-                inline: true,
-              },
-              {
-                name: "Info",
-                value: "Contacte un modérateur pour être désoumis.",
-                inline: false,
-              },
-            ],
-            timestamp: new Date().toISOString(),
-          },
-        ],
-      })
-      .catch(() => {});
-
-    // Sauvegarder et retirer les rôles
-    const removableRoles = member.roles.cache.filter(
-      (r) => r.name !== "@everyone" && !r.managed,
-    );
-    const roleIds = removableRoles.map((r) => r.id);
-
-    if (roleIds.length > 0) {
-      saveUserRoles(message.guild.id, message.author.id, roleIds);
-      await member.roles.remove(removableRoles);
-    }
-
-    // Ajouter le rôle soumis
-    await member.roles.add(soumisRole);
-
-    // Retirer le timeout s'il y en a un (le soumis suffit)
-    await member.timeout(null).catch(() => {});
-
-    // Enregistrer la sanction
-    addSanction(
-      message.guild.id,
-      message.author.id,
-      "soumis",
-      "3",
-      "[AntiSpam]",
-      `${typeLabels[violationType]} répété - ${details}`,
-      "Spam",
-      `${typeLabels[violationType]} - Soumis automatique`,
-    );
-
-    // Marquer l'utilisateur comme source potentielle de raid
-    if (["spam", "duplicate", "toxic", "mentions"].includes(violationType)) {
-      const label = typeLabels[violationType] || violationType;
-      markRaidSource(
-        message.guild.id,
-        message.author.id,
-        `${label} (Soumis Anti-Spam)`,
-      );
-    }
-
-    // Message dans le channel
-    const soumisEmbed = {
-      color: 0xff0000,
-      title: "🔒 Soumis - Anti-Spam",
-      description: `${message.author} a été **soumis** par le système anti-spam.\nTous ses rôles ont été retirés.`,
-      fields: [
-        {
-          name: "Raison",
-          value: `${typeLabels[violationType] || violationType} après avertissements`,
-          inline: true,
-        },
-        { name: "Strikes", value: "3/3 - Sanction maximale", inline: true },
-      ],
-      footer: { text: "Système Anti-Spam automatique" },
-      timestamp: new Date().toISOString(),
-    };
-
-    await message.channel.send({ embeds: [soumisEmbed] }).catch(() => null);
-
-    // Log modération
-    await logModAction(message.guild, {
-      action: "ANTISPAM - SOUMIS",
-      moderator: message.client.user,
-      target: message.author,
-      reason: `${typeLabels[violationType] || violationType} répété - ${details}`,
-      details:
-        "Strike 3/3 - Sanction maximale automatique\nTous les rôles retirés.",
-      color: 0xff0000,
-    }).catch(() => {});
-  } catch (error) {
-    console.error("[AntiSpam] Erreur soumis:", error);
-  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1121,13 +838,13 @@ function startCleanupInterval() {
 
     // Nettoyer les utilisateurs inactifs
     for (const [userId, data] of userTracker.entries()) {
-      const lastActivity =
-        data.messages.length > 0
-          ? data.messages[data.messages.length - 1].timestamp
-          : data.lastStrike;
+      const hasRecentMessages = data.messages.length > 0;
+      const hasRecentToxic =
+        Array.isArray(data.toxicMessages) && data.toxicMessages.length > 0;
 
-      if (now - lastActivity > CONFIG.DATA_EXPIRY && data.strikes === 0) {
+      if (!data.isSpamming && !data.isMuted && !hasRecentMessages && !hasRecentToxic) {
         userTracker.delete(userId);
+        continue;
       }
 
       // Nettoyer les vieux messages
@@ -1182,11 +899,20 @@ async function handleMessage(message) {
   // Ignorer les staff
   if (isStaff(message.member)) return false;
 
-  // Ignorer si déjà mute (pas besoin de re-sanctionner)
   const userData = getUserData(message.author.id);
+
+  // === GESTION DU SPAM EN COURS ===
+  if (userData.isSpamming) {
+    await handleOngoingSpam(message, userData);
+    return true;
+  }
+
+  // Ignorer si déjà mute (pas besoin de re-sanctionner)
   if (userData.isMuted) {
     // Resynchroniser avec Discord : fetch pour avoir l’état réel (unmute par un mod, etc.)
-    const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+    const member = await message.guild.members
+      .fetch(message.author.id)
+      .catch(() => null);
     const until = member?.communicationDisabledUntilTimestamp ?? null;
     const now = Date.now();
     if (until == null || (typeof until === "number" && until < now)) {
@@ -1280,6 +1006,14 @@ function init(client) {
 }
 
 /**
+ * Définit le flag isMuted pour un utilisateur (à appeler quand un mod fait -mute ou -tempmute).
+ */
+function setMutedState(userId) {
+  const userData = getUserData(userId);
+  userData.isMuted = true;
+}
+
+/**
  * Réinitialise le flag isMuted pour un utilisateur (à appeler quand un mod fait -unmute).
  */
 function clearMutedState(userId) {
@@ -1290,6 +1024,7 @@ function clearMutedState(userId) {
 module.exports = {
   handleMessage,
   init,
+  setMutedState,
   clearMutedState,
   CONFIG,
   // Exports pour tests/debug

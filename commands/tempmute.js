@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { addSanction, parseDuration, INFRACTION_CONFIG } = require('./utils/sanctionsHelper');
+const { setMutedState } = require('./utils/antispamHelper');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -164,6 +165,8 @@ async function startInteractiveMute(context, target, member) {
                 // Timeout
                 await member.timeout(durationMs, `Mute par ${user.tag} - ${selections.gravityLabel}`);
                 
+                setMutedState(target.id);
+
                 // Add Muted role if exists
                 const mutedRole = i.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
                 if (mutedRole) {

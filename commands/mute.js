@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { addSanction, INFRACTION_CONFIG } = require('./utils/sanctionsHelper');
+const { setMutedState } = require('./utils/antispamHelper');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -140,6 +141,8 @@ async function startInteractiveMutePermanent(context, target, member) {
                 if (mutedRole) {
                     await member.roles.add(mutedRole).catch(() => {});
                 }
+                
+                setMutedState(target.id);
                 
                 await member.timeout(28 * 24 * 60 * 60 * 1000, `Mute Permanent: ${selections.gravityLabel}`);
 
