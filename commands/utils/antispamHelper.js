@@ -13,15 +13,15 @@ const CONFIG = {
   TIME_WINDOW: 4000, // Fenêtre de 5 secondes
 
   // Messages dupliqués
-  DUPLICATE_LIMIT: 3, // Même message répété X fois
-  DUPLICATE_WINDOW: 30000, // Fenêtre de 30 secondes
+  DUPLICATE_LIMIT: 4, // Même message répété X fois
+  DUPLICATE_WINDOW: 4000, // Fenêtre de 30 secondes
 
   // Mention spam
   MENTION_LIMIT: 5, // Max mentions par message
 
   // Gestion des gros mots
-  TOXIC_WINDOW: 20000, // Fenêtre de 20 secondes pour compter les insultes
-  TOXIC_THRESHOLD_WORDS: 5, // Nombre total d'insultes dans la fenêtre avant action
+  TOXIC_WINDOW: 5000, // Fenêtre de 20 secondes pour compter les insultes
+  TOXIC_THRESHOLD_WORDS: 3, // Nombre total d'insultes dans la fenêtre avant action
   TOXIC_THRESHOLD_MESSAGES: 3, // Nombre de messages insultants avant action
   TOXIC_WORDS_IN_MESSAGE_THRESHOLD: 4, // Insultes dans un seul message pour déclencher direct
 
@@ -855,7 +855,12 @@ function startCleanupInterval() {
       const hasRecentToxic =
         Array.isArray(data.toxicMessages) && data.toxicMessages.length > 0;
 
-      if (!data.isSpamming && !data.isMuted && !hasRecentMessages && !hasRecentToxic) {
+      if (
+        !data.isSpamming &&
+        !data.isMuted &&
+        !hasRecentMessages &&
+        !hasRecentToxic
+      ) {
         userTracker.delete(userId);
         continue;
       }
