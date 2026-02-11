@@ -1,3 +1,4 @@
+const { EmbedBuilder } = require("discord.js");
 const { addSanction, parseDuration } = require("./sanctionsHelper");
 const { saveUserRoles } = require("./soumisHelper");
 const { logModAction } = require("./logHelper");
@@ -501,21 +502,33 @@ async function finalizeSpamBurst(guild, userId) {
       )
       .join("\n");
 
-    // Tronquer si trop long pour un message Discord
-    if (messageList.length > 1800) {
-      messageList = messageList.substring(0, 1797) + "...";
+    // Tronquer si trop long pour un embed Discord
+    if (messageList.length > 1000) {
+      messageList = messageList.substring(0, 997) + "...";
     }
 
-    const logMessage =
-      `${pings} **LOG DETECT SPAM**\n\n` +
-      `👤 **Utilisateur :** <@${userId}> (\`${userId}\`)\n` +
-      `🔢 **Nombre de messages supprimés :** ${count}\n` +
-      `📍 **Salon :** <#${channelId}>\n` +
-      `🔄 **Occurrence :** ${occurrence}${occurrence === 1 ? "ère" : "e"} fois\n\n` +
-      `📜 **Liste des messages :**\n${messageList}`;
+    const embed = new EmbedBuilder()
+      .setTitle("LOG DETECT SPAM")
+      .setColor(0xff0000)
+      .addFields(
+        {
+          name: "Utilisateur",
+          value: `<@${userId}> (\`${userId}\`)`,
+          inline: true,
+        },
+        { name: "Nombre de messages", value: `${count}`, inline: true },
+        { name: "Salon", value: `<#${channelId}>`, inline: true },
+        {
+          name: "Occurrence",
+          value: `${occurrence}${occurrence === 1 ? "ere" : "e"} fois`,
+          inline: true,
+        },
+        { name: "Messages supprimes", value: messageList || "Aucun contenu" },
+      )
+      .setTimestamp();
 
     await logChannel
-      .send(logMessage)
+      .send({ content: pings, embeds: [embed] })
       .catch((e) => console.error("[AntiSpam] Erreur log:", e));
   }
 
