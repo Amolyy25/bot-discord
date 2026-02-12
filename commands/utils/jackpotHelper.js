@@ -44,7 +44,9 @@ async function launchJackpot(client, overrideChannelId) {
       .setDescription(
         `Un siège vient de se libérer dans l'avion du QG ! ✈️\nPremier à cliquer sur ${randomReaction} gagne son rang !\n\nBonne chance à tous !`,
       )
-      .setThumbnail("https://i.imgur.com/mJ7u88r.png") // Optionnel: une image d'avion ou jackpot
+      .setThumbnail(
+        "https://cdn.discordapp.com/attachments/1469071690695704887/1471440449783730242/Gemini_Generated_Image_nvdzqgnvdzqgnvdz_1.png?ex=698ef135&is=698d9fb5&hm=f4004d5245ad76914d02f783db9d611b8cd117beb867de7e93e288d760767bb7&",
+      ) // Optionnel: une image d'avion ou jackpot
       .setFooter({ text: "Événement Flash - Soyez rapide !" })
       .setTimestamp();
 
@@ -57,7 +59,10 @@ async function launchJackpot(client, overrideChannelId) {
     await message.react(randomReaction);
 
     const filter = (reaction, user) => {
-      return reaction.emoji.name === randomReaction && !user.bot;
+        const isMatch = reaction.emoji.name === randomReaction;
+        const isNotBot = !user.bot;
+        console.log(`[Jackpot] Filtre: ${reaction.emoji.name} (attendu: ${randomReaction}) | User: ${user.tag} (Bot: ${user.bot}) | Match: ${isMatch && isNotBot}`);
+        return isMatch && isNotBot;
     };
 
     const collector = message.createReactionCollector({
@@ -66,11 +71,20 @@ async function launchJackpot(client, overrideChannelId) {
       time: 3600000,
     }); // 1h max pour cliquer
 
+    console.log('[Jackpot] Collecteur de réactions créé. En attente...');
+
     collector.on("collect", async (reaction, user) => {
-      const member = await channel.guild.members
-        .fetch(user.id)
-        .catch(() => null);
-      if (!member) return;
+      console.log(`[Jackpot] Réaction valide collectée: ${reaction.emoji.name} par ${user.tag} (${user.id})`);
+      
+      const member = await message.guild.members.fetch(user.id).catch(e => {
+        console.error(`[Jackpot] Erreur fetch membre:`, e);
+        return null;
+      });
+      
+      if (!member) {
+          console.log(`[Jackpot] Membre ${user.tag} introuvable ou erreur de fetch`);
+          return;
+      }
 
       // Tirage au sort du rôle
       const wonRole = drawRole();
@@ -87,6 +101,14 @@ async function launchJackpot(client, overrideChannelId) {
         await channel.send(
           `🏆 **FÉLICITATIONS ${user} !** Tu passes en **${wonRole.name}** ! Profite bien de ta visibilité pendant 24h ! ✈️✨`,
         );
+
+        // Supprimer le message original du Jackpot
+        try {
+            await message.delete();
+            console.log('[Jackpot] Message original supprimé.');
+        } catch (delError) {
+            console.error('[Jackpot] Impossible de supprimer le message:', delError);
+        }
 
         // Programmer la suppression après 24h
         setTimeout(
