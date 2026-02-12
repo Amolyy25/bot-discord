@@ -123,6 +123,7 @@ function removePermission(commandName, type, id) {
 /**
  * Vérifie et consomme l'utilisation d'un rôle si nécessaire.
  * Appelé APRÈS l'exécution réussie d'une commande.
+ * Implémente une logique robuste "One Strike, All Out" pour les rôles multiples.
  * @param {import('discord.js').GuildMember} member 
  * @param {string} commandName 
  */
@@ -133,33 +134,54 @@ async function checkAndConsumeRole(member, commandName) {
     const roleLimits = perms[commandName].roleLimits;
     const usageData = loadUsageData();
 
-    // Vérifier chaque rôle du membre pour voir s'il a une limite configurée pour cette commande
-    for (const [roleId, limit] of Object.entries(roleLimits)) {
+    // Identifier tous les rôles limités que possède l'utilisateur
+    const userRolesWithLimits = [];
+    for (const roleId of Object.keys(roleLimits)) {
         if (member.roles.cache.has(roleId)) {
-            // Clé unique pour stocker l'usage : userId-commandName-roleId
-            const usageKey = `${member.id}-${commandName}-${roleId}`;
-            
-            // Initialiser ou incrémenter le compteur
-            if (!usageData[usageKey]) usageData[usageKey] = 0;
-            usageData[usageKey]++;
-            
-            console.log(`[PermHelper] Commande ${commandName} utilisée par ${member.user.tag} (Rôle ${roleId}). Usage: ${usageData[usageKey]}/${limit}`);
+            userRolesWithLimits.push(roleId);
+        }
+    }
 
-            // Vérifier si la limite est atteinte
-            if (usageData[usageKey] >= limit) {
-                try {
-                    await member.roles.remove(roleId);
-                    console.log(`[PermHelper] Limite atteinte. Rôle ${roleId} retiré de ${member.user.tag}.`);
-                    
-                    // Reset le compteur une fois le rôle retiré (pour si on lui redonne plus tard)
-                    delete usageData[usageKey];
-                    
-                    // Notifier l'utilisateur (optionnel, peut être spammy si pas géré)
-                    // member.send(`Votre rôle pour la commande ${commandName} a expiré (limite atteinte).`).catch(() => {});
-                } catch (error) {
-                    console.error(`[PermHelper] Erreur lors du retrait du rôle ${roleId} :`, error);
-                }
-            }
+    if (userRolesWithLimits.length === 0) return;
+
+    const rolesToRemove = new Set();
+    let shouldTriggerMassRemoval = false;
+
+    // 1. Mise à jour des compteurs et détection des dépassements
+    for (const roleId of userRolesWithLimits) {
+        const limit = roleLimits[roleId];
+        const usageKey = `${member.id}-${commandName}-${roleId}`; // Clé unique par user+commande+rôle
+
+        if (!usageData[usageKey]) usageData[usageKey] = 0;
+        usageData[usageKey]++;
+        
+        console.log(`[PermHelper] Commande ${commandName} utilisée par ${member.user.tag} (Rôle ${roleId}). Usage: ${usageData[usageKey]}/${limit}`);
+
+        if (usageData[usageKey] >= limit) {
+            shouldTriggerMassRemoval = true; // Un rôle a atteint sa limite -> on déclenche le nettoyage
+        }
+    }
+
+    // 2. Logique "Infallible" : Si un rôle doit sauter, tous les autres rôles donnant accès à cette commande sautent aussi
+    // Cela empêche le cumul de rôles pour contourner les limites.
+    if (shouldTriggerMassRemoval) {
+        for (const roleId of userRolesWithLimits) {
+            rolesToRemove.add(roleId);
+        }
+    }
+
+    // 3. Exécution des suppressions
+    for (const roleId of rolesToRemove) {
+        try {
+            await member.roles.remove(roleId);
+            console.log(`[PermHelper] Limite atteinte (ou effet cascade). Rôle ${roleId} retiré de ${member.user.tag}.`);
+            
+            // Reset le compteur une fois le rôle retiré (pour permettre la réutilisation future si le rôle est rendu)
+            const usageKey = `${member.id}-${commandName}-${roleId}`;
+            delete usageData[usageKey];
+            
+        } catch (error) {
+            console.error(`[PermHelper] Erreur lors du retrait du rôle ${roleId} :`, error);
         }
     }
     
