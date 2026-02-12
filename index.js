@@ -183,21 +183,9 @@ client.once('ready', () => {
     // Initialiser le Jackpot Chrono
     jackpot.init(client);
 
-    // Cron job pour le Jackpot Chrono (chaque jour à une heure aléatoire entre 10h et 22h)
-    // On lance une vérification toutes les heures pour voir si on déclenche
-    cron.schedule('0 * * * *', () => {
-        const now = new Date();
-        const hour = now.getHours();
-        
-        // Si on est entre 10h et 22h, on a une chance sur 12 de lancer (pour que ça arrive environ une fois par jour)
-        // Ou plus simple, on fixe une heure aléatoire au démarrage du bot pour la journée
-        if (hour >= 10 && hour <= 22) {
-            const chance = Math.random();
-            if (chance < 0.08) { // ~1/12 de chance chaque heure entre 10h et 22h
-                console.log('[Jackpot] Déclenchement aléatoire détecté !');
-                jackpot.launchJackpot(client);
-            }
-        }
+    // Cron job pour le Jackpot Chrono (Check toutes les minutes pour être précis)
+    cron.schedule('* * * * *', () => {
+        jackpot.checkCron(client);
     }, {
         timezone: "Europe/Paris"
     });
