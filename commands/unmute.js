@@ -15,12 +15,15 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-        const { isStaff, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isStaff, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(interaction.member);
-        if (!isModChannel(interaction.channelId) && !adminStatus) return;
-        if (!isStaff(interaction.member)) {
+        
+        // Vérification de permission : 'unmute' ou isStaff par défaut
+        if (!checkPermission(interaction.member, 'unmute', isStaff)) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
+        
+        if (!isModChannel(interaction.channelId) && !adminStatus) return;
 
         const target = interaction.options.getUser('utilisateur');
         const reason = interaction.options.getString('raison') || 'Aucune raison fournie';
@@ -69,12 +72,15 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isStaff, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isStaff, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(message.member);
-        if (!isModChannel(message.channel.id) && !adminStatus) return;
-        if (!isStaff(message.member)) {
+        
+        // Vérification de permission : 'unmute' ou isStaff par défaut
+        if (!checkPermission(message.member, 'unmute', isStaff)) {
             return message.reply('non ta pas la perm');
         }
+
+        if (!isModChannel(message.channel.id) && !adminStatus) return;
 
         if (!args[0]) {
             return message.reply('Veuillez mentionner un utilisateur à démuter!');

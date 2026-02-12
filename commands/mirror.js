@@ -20,12 +20,14 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-        const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
-        if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
-
-        if (!isBoosterOrPerm2(interaction.member)) {
+        const { checkPermission, isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
+        
+        // Vérification de permission : 'mirror' ou isBoosterOrPerm2 par défaut
+        if (!checkPermission(interaction.member, 'mirror', isBoosterOrPerm2)) {
             return interaction.reply({ content: 'non ta pas la perm (Booster minimum)', ephemeral: true });
         }
+
+        if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
 
         const target = interaction.options.getUser('utilisateur');
         let duration = interaction.options.getInteger('duree') || 2;
@@ -38,12 +40,14 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
-        if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
-
-        if (!isBoosterOrPerm2(message.member)) {
+        const { checkPermission, isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
+        
+        // Vérification de permission : 'mirror' ou isBoosterOrPerm2 par défaut
+        if (!checkPermission(message.member, 'mirror', isBoosterOrPerm2)) {
             return message.reply('non ta pas la perm (Booster minimum)');
         }
+
+        if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
 
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
         if (!target) return message.reply('Usage: -mirror @utilisateur [minutes]');

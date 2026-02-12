@@ -10,15 +10,19 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-        const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
         const currentMember = interaction.member;
         const allowedRole = '1470487259315835052';
+        const adminStatus = isAdmin(currentMember);
         
-        if (isModChannel(interaction.channelId) && !isAdmin(currentMember)) return;
-        
-        if (!isBoosterOrPerm2(currentMember) && !currentMember.roles.cache.has(allowedRole)) {
+        // Vérification combinée : 'pic' OU isBoosterOrPerm2 OU rôle spécifique
+        const hasPerm = checkPermission(currentMember, 'pic', (m) => isBoosterOrPerm2(m) || m.roles.cache.has(allowedRole));
+
+        if (!hasPerm) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
+        
+        if (isModChannel(interaction.channelId) && !adminStatus) return;
 
         const user = interaction.options.getUser('utilisateur') || interaction.user;
         const member = await interaction.guild.members.fetch(user.id);
@@ -57,14 +61,18 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
         const allowedRole = '1470487259315835052';
+        const adminStatus = isAdmin(message.member);
         
-        if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
-        
-        if (!isBoosterOrPerm2(message.member) && !message.member.roles.cache.has(allowedRole)) {
+        // Vérification combinée : 'pic' OU isBoosterOrPerm2 OU rôle spécifique
+        const hasPerm = checkPermission(message.member, 'pic', (m) => isBoosterOrPerm2(m) || m.roles.cache.has(allowedRole));
+
+        if (!hasPerm) {
             return message.reply('non ta pas la perm');
         }
+        
+        if (isModChannel(message.channel.id) && !adminStatus) return;
 
         let user = message.mentions.users.first();
         

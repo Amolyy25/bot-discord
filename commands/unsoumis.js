@@ -12,10 +12,14 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
-        if (!isPerm3OrAdmin(interaction.member)) {
+        const { checkPermission, isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        
+        // Vérification combinée : 'unsoumis' OU isPerm3OrAdmin
+        const hasPerm = checkPermission(interaction.member, 'unsoumis', isPerm3OrAdmin);
+        if (!hasPerm) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
+
         const adminStatus = isAdmin(interaction.member);
         const isGeneral = interaction.channel.name.toLowerCase().includes('general');
         if (!isModChannel(interaction.channelId) && !isGeneral && !adminStatus) return;
@@ -57,10 +61,14 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
-        if (!isPerm3OrAdmin(message.member)) {
+        const { checkPermission, isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        
+        // Vérification combinée : 'unsoumis' OU isPerm3OrAdmin
+        const hasPerm = checkPermission(message.member, 'unsoumis', isPerm3OrAdmin);
+        if (!hasPerm) {
             return message.reply('non ta pas la perm');
         }
+
         const adminStatus = isAdmin(message.member);
         const isGeneral = message.channel.name.toLowerCase().includes('general');
         if (!isModChannel(message.channel.id) && !isGeneral && !adminStatus) return;

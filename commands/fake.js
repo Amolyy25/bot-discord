@@ -14,14 +14,18 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
         const currentMember = interaction.member;
         const allowedRole = '1470487259315835052';
         const adminStatus = isAdmin(currentMember);
 
+        // Bypass admin, sinon pas dans le salon modé
         if (isModChannel(interaction.channelId) && !adminStatus) return;
         
-        if (!isBoosterOrPerm2(currentMember) && !currentMember.roles.cache.has(allowedRole)) {
+        // Vérification combinée : 'fake' OU isBoosterOrPerm2 OU rôle spécifique
+        const hasPerm = checkPermission(currentMember, 'fake', (m) => isBoosterOrPerm2(m) || m.roles.cache.has(allowedRole));
+
+        if (!hasPerm) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
         const target = interaction.options.getUser('utilisateur');
@@ -29,13 +33,16 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isBoosterOrPerm2, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(message.member);
         const allowedRole = '1470487259315835052';
 
         if (isModChannel(message.channel.id) && !adminStatus) return;
         
-        if (!isBoosterOrPerm2(message.member) && !message.member.roles.cache.has(allowedRole)) {
+        // Vérification combinée : 'fake' OU isBoosterOrPerm2 OU rôle spécifique
+        const hasPerm = checkPermission(message.member, 'fake', (m) => isBoosterOrPerm2(m) || m.roles.cache.has(allowedRole));
+
+        if (!hasPerm) {
             return message.reply('non ta pas la perm');
         }
 

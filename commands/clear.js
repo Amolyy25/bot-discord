@@ -10,12 +10,15 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        const { isStaff, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isStaff, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(interaction.member);
-        if (!isModChannel(interaction.channelId) && !adminStatus) return;
-        if (!isStaff(interaction.member)) {
+        
+        // Vérification de permission : 'clear' ou isStaff par défaut
+        if (!checkPermission(interaction.member, 'clear', isStaff)) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
+        
+        if (!isModChannel(interaction.channelId) && !adminStatus) return;
 
         const amount = interaction.options.getInteger('nombre');
 
@@ -54,10 +57,11 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isStaff, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isStaff, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(message.member);
-        if (!isModChannel(message.channel.id) && !adminStatus) return;
-        if (!isStaff(message.member)) {
+        
+        // Vérification de permission : 'clear' ou isStaff par défaut
+        if (!checkPermission(message.member, 'clear', isStaff)) {
             return message.reply('non ta pas la perm');
         }
 

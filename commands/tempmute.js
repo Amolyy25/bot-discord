@@ -13,12 +13,16 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        const { isStaffTest, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isStaffTest, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(interaction.member);
-        if (!isModChannel(interaction.channelId) && !adminStatus) return;
-        if (!isStaffTest(interaction.member)) {
+        
+        // Vérification de permission : 'tempmute' ou isStaffTest par défaut
+        if (!checkPermission(interaction.member, 'tempmute', isStaffTest)) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
+        
+        if (!isModChannel(interaction.channelId) && !adminStatus) return;
+
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
@@ -32,12 +36,15 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isStaffTest, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isStaffTest, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(message.member);
-        if (!isModChannel(message.channel.id) && !adminStatus) return;
-        if (!isStaffTest(message.member)) {
+        
+        // Vérification de permission : 'tempmute' ou isStaffTest par défaut
+        if (!checkPermission(message.member, 'tempmute', isStaffTest)) {
             return message.reply('non ta pas la perm');
         }
+
+        if (!isModChannel(message.channel.id) && !adminStatus) return;
 
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
         if (!target) return message.reply('Usage: -tempmute @utilisateur ou ID');
