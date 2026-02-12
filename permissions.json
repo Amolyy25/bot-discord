@@ -1,1 +1,13 @@
-{}
+{
+    "testcmd": {
+        "users": [],
+        "roles": [
+            "roleA",
+            "roleB"
+        ],
+        "roleLimits": {
+            "roleA": 1,
+            "roleB": 5
+        }
+    }
+}

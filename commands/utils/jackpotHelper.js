@@ -6,7 +6,7 @@ const JACKPOT_FILE = path.join(__dirname, '../../jackpot.json');
 
 const CONFIG = {
   // Le salon par défaut pour le Jackpot
-  CHANNEL_ID: "1469071689798000676", // ID GÉNÉRAL (mis à jour selon demande user: "dans général")
+  CHANNEL_ID: "1469071691941412962", // ID GÉNÉRAL CORRIGÉ
   PING_ROLE_ID: "1469071689756442798", // Rôle à ping
   ROLES: [
     { id: "1471433193608712192", name: "Voyageur (Commun)", chance: 60 },

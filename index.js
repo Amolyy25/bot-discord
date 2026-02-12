@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -190,7 +190,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
 });
 
-client.once('ready', () => {
+// Utilisez Events.ClientReady (v14+) pour éviter le warning
+client.once(Events.ClientReady, () => {
     console.log(`Connecté en tant que ${client.user.tag}`);
 
     // Initialiser l'anti-spam

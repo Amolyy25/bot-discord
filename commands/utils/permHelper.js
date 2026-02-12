@@ -217,7 +217,7 @@ const ROLES = {
 };
 
 const MOD_CHANNEL_ID = '1469258215916175392';
-const GENERAL_CHANNEL_ID = '1469071689798000676';
+const GENERAL_CHANNEL_ID = '1469071691941412962';
 
 function hasAnyRole(member, roleIds) {
     if (!member) return false;
