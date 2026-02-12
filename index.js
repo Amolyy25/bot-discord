@@ -6,6 +6,7 @@ const http = require('http');
 const cron = require('node-cron');
 const statsCommand = require('./commands/stats.js');
 const antispam = require('./commands/utils/antispamHelper');
+const jackpot = require('./commands/utils/jackpotHelper');
 
 // Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
 const PORT = process.env.PORT || 8080;
@@ -176,6 +177,28 @@ client.once('ready', () => {
 
     // Initialiser l'anti-spam
     antispam.init(client);
+
+    // Initialiser le Jackpot Chrono
+    jackpot.init(client);
+
+    // Cron job pour le Jackpot Chrono (chaque jour à une heure aléatoire entre 10h et 22h)
+    // On lance une vérification toutes les heures pour voir si on déclenche
+    cron.schedule('0 * * * *', () => {
+        const now = new Date();
+        const hour = now.getHours();
+        
+        // Si on est entre 10h et 22h, on a une chance sur 12 de lancer (pour que ça arrive environ une fois par jour)
+        // Ou plus simple, on fixe une heure aléatoire au démarrage du bot pour la journée
+        if (hour >= 10 && hour <= 22) {
+            const chance = Math.random();
+            if (chance < 0.08) { // ~1/12 de chance chaque heure entre 10h et 22h
+                console.log('[Jackpot] Déclenchement aléatoire détecté !');
+                jackpot.launchJackpot(client);
+            }
+        }
+    }, {
+        timezone: "Europe/Paris"
+    });
 
     // Cron job à 9h00
     cron.schedule('0 9 * * *', async () => {
