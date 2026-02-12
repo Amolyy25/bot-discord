@@ -60,6 +60,7 @@ async function init(client) {
   
   const data = loadJackpotData();
   const now = Date.now();
+  const todayStr = new Date().toLocaleDateString('fr-FR');
 
   // 1. Restaurer les expirations de rôles (Nettoyage au démarrage)
   if (data.activeRoles) {
@@ -85,7 +86,45 @@ async function init(client) {
       }
   }
 
-    // 2. Vérifier/Générer l'heure du jackpot d'aujourd'hui
+    // 2. Vérifier si on a raté un Jackpot (Rattrapage)
+    if (data.nextJackpot) {
+        const nextDate = new Date(data.nextJackpot);
+        
+        // Si la date prévue est passée ET que c'était aujourd'hui
+        if (data.nextJackpot < now && nextDate.toLocaleDateString('fr-FR') === todayStr) {
+            
+            // Et qu'on n'a pas déjà joué aujourd'hui (double check)
+            let alreadyPlayedToday = false;
+            if (data.lastJackpot) {
+                const lastDate = new Date(data.lastJackpot);
+                if (lastDate.toLocaleDateString('fr-FR') === todayStr) {
+                    alreadyPlayedToday = true;
+                }
+            }
+
+            if (!alreadyPlayedToday) {
+                console.log(`[Jackpot] ⚠️ RATTRAPAGE : Jackpot prévu à ${nextDate.toLocaleTimeString()} manqué ! Lancement immédiat...`);
+                
+                // On lance le rattrapage après un petit délai pour être sûr que le bot est fully ready
+                setTimeout(() => {
+                    launchJackpot(client);
+                    
+                    // Update state comme si c'était fait à l'heure
+                    const newData = loadJackpotData();
+                    newData.lastJackpot = now;
+                    newData.nextJackpot = null;
+                    saveJackpotData(newData);
+                    
+                    // Replanifier pour demain
+                    setTimeout(() => checkAndScheduleNextJackpot(), 10000);
+                }, 10000); // 10s délai
+                
+                return; // On sort pour ne pas replanifier tout de suite
+            }
+        }
+    }
+
+    // 3. Vérifier/Générer l'heure du jackpot normalement
   checkAndScheduleNextJackpot();
 }
 
