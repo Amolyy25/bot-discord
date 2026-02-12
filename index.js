@@ -104,6 +104,14 @@ client.on('interactionCreate', async interaction => {
 
     try {
         await command.execute(interaction, client, snipes);
+        
+        // Vérifier si un rôle doit être consommé (retiré après usage)
+        try {
+            const { checkAndConsumeRole } = require('./commands/utils/permHelper');
+            await checkAndConsumeRole(interaction.member, command.data.name);
+        } catch (e) {
+            console.error('Erreur checkAndConsumeRole:', e);
+        }
     } catch (error) {
         console.error(error);
         await interaction.reply({ content: 'Erreur lors de l\'exécution de la commande!', ephemeral: true });
@@ -146,6 +154,14 @@ client.on('messageCreate', async message => {
 
     try {
         await command.executeMessage(message, args, client, snipes);
+        
+        // Vérifier si un rôle doit être consommé (retiré après usage)
+        try {
+            const { checkAndConsumeRole } = require('./commands/utils/permHelper');
+            await checkAndConsumeRole(message.member, commandName);
+        } catch (e) {
+            console.error('Erreur checkAndConsumeRole:', e);
+        }
     } catch (error) {
         console.error(error);
         message.reply('Erreur lors de l\'exécution de la commande!');

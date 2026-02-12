@@ -76,7 +76,7 @@ async function init(client) {
       }
   }
 
-  // 2. Vérifier/Générer l'heure du jackpot d'aujourd'hui
+    // 2. Vérifier/Générer l'heure du jackpot d'aujourd'hui
   checkAndScheduleNextJackpot();
 }
 
@@ -93,7 +93,10 @@ function checkAndScheduleNextJackpot() {
         const nextDate = new Date(data.nextJackpot);
         // Si c'est aujourd'hui et dans le futur, c'est bon
         if (nextDate.toLocaleDateString('fr-FR') === todayStr && nextDate > now) {
-            console.log(`[Jackpot] Prochain événement prévu à ${nextDate.toLocaleTimeString()}`);
+            console.log(`[Jackpot] 📅 Prochain événement prévu aujourd'hui à ${nextDate.toLocaleTimeString('fr-FR')}`);
+            return;
+        } else if (nextDate > now) {
+            console.log(`[Jackpot] 📅 Prochain événement prévu le ${nextDate.toLocaleDateString('fr-FR')} à ${nextDate.toLocaleTimeString('fr-FR')}`);
             return;
         }
         // Si c'est passé (hier ou plus tôt), on doit en replanifier un pour aujourd'hui

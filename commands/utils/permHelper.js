@@ -4,6 +4,8 @@ const path = require('path');
 
 // Fichier JSON pour stocker les permissions dynamiques
 const PERMISSIONS_FILE = path.join(__dirname, '../../permissions.json');
+// Fichier JSON pour stocker l'utilisation des commandes (compteurs)
+const USAGE_FILE = path.join(__dirname, '../../commandUsage.json');
 
 // --- Gestion des Permissions Dynamiques ---
 
@@ -25,6 +27,23 @@ function loadPermissions() {
 }
 
 /**
+ * Charge les données d'utilisation depuis le fichier JSON
+ */
+function loadUsageData() {
+    try {
+        if (!fs.existsSync(USAGE_FILE)) {
+            fs.writeFileSync(USAGE_FILE, JSON.stringify({}));
+            return {};
+        }
+        const data = fs.readFileSync(USAGE_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Erreur lors du chargement des usages:', error);
+        return {};
+    }
+}
+
+/**
  * Sauvegarde les permissions dans le fichier JSON
  */
 function savePermissions(perms) {
@@ -36,19 +55,43 @@ function savePermissions(perms) {
 }
 
 /**
+ * Sauvegarde les données d'utilisation dans le fichier JSON
+ */
+function saveUsageData(data) {
+    try {
+        fs.writeFileSync(USAGE_FILE, JSON.stringify(data, null, 4));
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde des usages:', error);
+    }
+}
+
+/**
  * Ajoute une permission à un utilisateur ou un rôle pour une commande donnée
  * @param {string} commandName Nom de la commande (ex: 'ban')
  * @param {string} type 'user' ou 'role'
  * @param {string} id ID de l'utilisateur ou du rôle
+ * @param {number} [limit] (Optionnel) Limite d'utilisation pour le rôle avant qu'il ne soit retiré
  */
-function addPermission(commandName, type, id) {
+function addPermission(commandName, type, id, limit) {
     const perms = loadPermissions();
-    if (!perms[commandName]) perms[commandName] = { users: [], roles: [] };
+    if (!perms[commandName]) perms[commandName] = { users: [], roles: [], roleLimits: {} };
     
     if (type === 'user' && !perms[commandName].users.includes(id)) {
         perms[commandName].users.push(id);
-    } else if (type === 'role' && !perms[commandName].roles.includes(id)) {
-        perms[commandName].roles.push(id);
+    } else if (type === 'role') {
+        if (!perms[commandName].roles.includes(id)) {
+            perms[commandName].roles.push(id);
+        }
+        // Si une limite est définie, on l'ajoute/met à jour
+        if (limit && limit > 0) {
+            if (!perms[commandName].roleLimits) perms[commandName].roleLimits = {};
+            perms[commandName].roleLimits[id] = limit;
+        } else {
+            // Si pas de limite, on retire une éventuelle limite existante
+            if (perms[commandName].roleLimits && perms[commandName].roleLimits[id]) {
+                delete perms[commandName].roleLimits[id];
+            }
+        }
     }
     
     savePermissions(perms);
@@ -68,9 +111,59 @@ function removePermission(commandName, type, id) {
         perms[commandName].users = perms[commandName].users.filter(uid => uid !== id);
     } else if (type === 'role') {
         perms[commandName].roles = perms[commandName].roles.filter(rid => rid !== id);
+        // Nettoyer aussi les limites
+        if (perms[commandName].roleLimits && perms[commandName].roleLimits[id]) {
+            delete perms[commandName].roleLimits[id];
+        }
     }
 
     savePermissions(perms);
+}
+
+/**
+ * Vérifie et consomme l'utilisation d'un rôle si nécessaire.
+ * Appelé APRÈS l'exécution réussie d'une commande.
+ * @param {import('discord.js').GuildMember} member 
+ * @param {string} commandName 
+ */
+async function checkAndConsumeRole(member, commandName) {
+    const perms = loadPermissions();
+    if (!perms[commandName] || !perms[commandName].roleLimits) return;
+
+    const roleLimits = perms[commandName].roleLimits;
+    const usageData = loadUsageData();
+
+    // Vérifier chaque rôle du membre pour voir s'il a une limite configurée pour cette commande
+    for (const [roleId, limit] of Object.entries(roleLimits)) {
+        if (member.roles.cache.has(roleId)) {
+            // Clé unique pour stocker l'usage : userId-commandName-roleId
+            const usageKey = `${member.id}-${commandName}-${roleId}`;
+            
+            // Initialiser ou incrémenter le compteur
+            if (!usageData[usageKey]) usageData[usageKey] = 0;
+            usageData[usageKey]++;
+            
+            console.log(`[PermHelper] Commande ${commandName} utilisée par ${member.user.tag} (Rôle ${roleId}). Usage: ${usageData[usageKey]}/${limit}`);
+
+            // Vérifier si la limite est atteinte
+            if (usageData[usageKey] >= limit) {
+                try {
+                    await member.roles.remove(roleId);
+                    console.log(`[PermHelper] Limite atteinte. Rôle ${roleId} retiré de ${member.user.tag}.`);
+                    
+                    // Reset le compteur une fois le rôle retiré (pour si on lui redonne plus tard)
+                    delete usageData[usageKey];
+                    
+                    // Notifier l'utilisateur (optionnel, peut être spammy si pas géré)
+                    // member.send(`Votre rôle pour la commande ${commandName} a expiré (limite atteinte).`).catch(() => {});
+                } catch (error) {
+                    console.error(`[PermHelper] Erreur lors du retrait du rôle ${roleId} :`, error);
+                }
+            }
+        }
+    }
+    
+    saveUsageData(usageData);
 }
 
 /**
@@ -149,6 +242,7 @@ module.exports = {
     addPermission,
     removePermission,
     checkPermission,
+    checkAndConsumeRole,
 
     // Wrappers rétro-compatibles (mais idéalement on migrera vers checkPermission)
     isModChannel: (channelId) => channelId === MOD_CHANNEL_ID,
