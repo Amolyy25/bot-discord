@@ -97,6 +97,137 @@ client.on('messageDelete', async (message) => {
 });
 
 client.on('interactionCreate', async interaction => {
+    // Gestion des boutons du système de signalement
+    if (interaction.isButton() && interaction.customId.startsWith('signaler_')) {
+        const parts = interaction.customId.split('_');
+        const action = parts[1]; // tempmute, ban, mute
+        
+        // Extraction de l'ID selon le format
+        let targetId;
+        if (action === 'tempmute') {
+            targetId = parts[3];
+        } else {
+            targetId = parts[2];
+        }
+
+        // Rôle requis pour Ban et Mute Def
+        const HIGH_STAFF_ROLE = '1471886110434132137';
+        
+        const { PermissionFlagsBits } = require('discord.js');
+        const { addSanction } = require('./commands/utils/sanctionsHelper');
+        const { logModAction } = require('./commands/utils/logHelper');
+        const { setMutedState } = require('./commands/utils/antispamHelper');
+
+        // Vérification des permissions
+        if (action === 'ban' || action === 'mute') {
+            if (!interaction.member.roles.cache.has(HIGH_STAFF_ROLE) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: '❌ Vous n\'avez pas la permission requise (Haut Staff).', ephemeral: true });
+            }
+        } else if (action === 'tempmute') {
+             // Pour tempmute, on accepte le rôle Staff (1471893729060192256) ou Haut Staff
+             const STAFF_ROLE = '1471893729060192256';
+             if (!interaction.member.roles.cache.has(STAFF_ROLE) && !interaction.member.roles.cache.has(HIGH_STAFF_ROLE)) {
+                return interaction.reply({ content: '❌ Vous n\'avez pas la permission de modérer.', ephemeral: true });
+             }
+        }
+
+        const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
+        if (!targetMember && action !== 'ban') { // On peut bannir par ID
+             return interaction.reply({ content: '❌ Utilisateur introuvable ou parti du serveur.', ephemeral: true });
+        }
+
+        try {
+            if (action === 'tempmute') {
+                const durationType = parts[2]; // 10m, 15m, 30m
+
+                let durationMs;
+                let durationLabel;
+                switch (durationType) {
+                    case '10m': durationMs = 10 * 60 * 1000; durationLabel = '10 minutes'; break;
+                    case '15m': durationMs = 15 * 60 * 1000; durationLabel = '15 minutes'; break;
+                    case '30m': durationMs = 30 * 60 * 1000; durationLabel = '30 minutes'; break;
+                    default: return interaction.reply({ content: 'Durée invalide.', ephemeral: true });
+                }
+
+                await targetMember.timeout(durationMs, `Signalement - Action rapide par ${interaction.user.tag}`);
+                
+                // Muted Role
+                const mutedRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
+                if (mutedRole) {
+                    await targetMember.roles.add(mutedRole).catch(() => {});
+                    setMutedState(targetId);
+                    setTimeout(() => {
+                        targetMember.roles.remove(mutedRole).catch(() => {});
+                    }, durationMs);
+                }
+
+                addSanction(interaction.guild.id, targetId, 'tempmute', '2', interaction.user.tag, 'Via Signalement', 'Autre', `Tempmute ${durationLabel}`, durationType);
+                
+                await logModAction(interaction.guild, {
+                    action: 'TEMPMUTE',
+                    moderator: interaction.user,
+                    target: targetMember.user,
+                    reason: `Via Signalement - ${durationLabel}`,
+                    details: `Durée: ${durationLabel}`,
+                    color: 0xFFA500
+                });
+
+                await interaction.reply({ content: `✅ **${targetMember.user.tag}** a été rendu muet pour ${durationLabel}.`, ephemeral: true });
+
+            } else if (action === 'ban') {
+                // parts[2] est l'ID
+                await interaction.guild.bans.create(targetId, { reason: `Signalement - Action rapide par ${interaction.user.tag}` });
+                
+                addSanction(interaction.guild.id, targetId, 'ban', '3', interaction.user.tag, 'Via Signalement', 'Autre', 'Bannissement', 'permanent');
+                 
+                // On essaie de fetch user pour le log
+                const targetUserObj = await client.users.fetch(targetId).catch(() => ({ tag: 'Inconnu', id: targetId }));
+
+                await logModAction(interaction.guild, {
+                    action: 'BAN',
+                    moderator: interaction.user,
+                    target: targetUserObj,
+                    reason: 'Via Signalement',
+                    details: 'Bannissement définitif',
+                    color: 0xFF0000
+                });
+
+                await interaction.reply({ content: `✅ **${targetUserObj.tag || targetId}** a été banni.`, ephemeral: true });
+
+            } else if (action === 'mute') {
+                 // Mute Def
+                 if (!targetMember) return interaction.reply({ content: '❌ Utilisateur introuvable.', ephemeral: true });
+
+                 const mutedRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
+                 if (mutedRole) await targetMember.roles.add(mutedRole).catch(() => {});
+                 
+                 setMutedState(targetId);
+                 await targetMember.timeout(28 * 24 * 60 * 60 * 1000, `Signalement - Mute Def par ${interaction.user.tag}`); // Max timeout ~28 jours
+
+                 addSanction(interaction.guild.id, targetId, 'mute', '3', interaction.user.tag, 'Via Signalement', 'Autre', 'Mute Définitif', 'permanent');
+
+                 await logModAction(interaction.guild, {
+                    action: 'MUTE PERMANENT',
+                    moderator: interaction.user,
+                    target: targetMember.user,
+                    reason: 'Via Signalement',
+                    details: 'Mute définitif',
+                    color: 0xFF0000
+                });
+
+                await interaction.reply({ content: `✅ **${targetMember.user.tag}** a été rendu muet définitivement.`, ephemeral: true });
+            }
+
+            // Optionnel : Mettre à jour le message pour dire "Traité"
+            // await interaction.message.edit(...) 
+
+        } catch (error) {
+            console.error('Erreur action rapide signalement:', error);
+            await interaction.reply({ content: '❌ Une erreur est survenue lors de l\'application de la sanction.', ephemeral: true });
+        }
+        return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const command = client.commands.get(interaction.commandName);
