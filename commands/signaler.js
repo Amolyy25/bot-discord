@@ -79,21 +79,21 @@ module.exports = {
         const joinedAt = targetMember ? `<t:${Math.floor(targetMember.joinedTimestamp / 1000)}:R>` : 'Inconnu';
         
         const reportEmbed = new EmbedBuilder()
-            .setColor(0xFFA500) // Orange pour signalement
-            .setTitle('🚨 Nouveau Signalement')
+            .setColor(0xFFFFFF)
+            .setTitle('Nouveau Signalement')
             .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
             .addFields(
-                { name: '👤 Signalé', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
-                { name: '🕵️ Signaleur', value: `${message.author.tag} (\`${message.author.id}\`)`, inline: true },
-                { name: '📍 Salon', value: `<#${message.channel.id}>`, inline: true },
-                { name: '📅 Arrivée serveur', value: joinedAt, inline: true },
-                { name: '📝 Raison', value: reason }
+                { name: 'Signalé', value: `${targetUser.tag} (\`${targetUser.id}\`)`, inline: true },
+                { name: 'Signaleur', value: `${message.author.tag} (\`${message.author.id}\`)`, inline: true },
+                { name: 'Salon', value: `<#${message.channel.id}>`, inline: true },
+                { name: 'Arrivée serveur', value: joinedAt, inline: true },
+                { name: 'Raison', value: reason }
             )
             .setTimestamp();
 
         if (referencedMessage && referencedMessage.content) {
             reportEmbed.addFields({ 
-                name: '💬 Contenu du message signalé', 
+                name: 'Contenu du message signalé', 
                 value: referencedMessage.content.length > 1024 ? referencedMessage.content.substring(0, 1021) + '...' : referencedMessage.content 
             });
         }
@@ -134,7 +134,11 @@ module.exports = {
                 new ButtonBuilder()
                     .setCustomId(`signaler_mute_${targetUser.id}`)
                     .setLabel('Mute Def')
-                    .setStyle(ButtonStyle.Danger)
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId(`signaler_traite_${targetUser.id}`)
+                    .setLabel('Marquer comme traité')
+                    .setStyle(ButtonStyle.Success)
             );
 
         // 6. Envoyer le log

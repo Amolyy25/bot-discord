@@ -216,15 +216,62 @@ client.on('interactionCreate', async interaction => {
                 });
 
                 await interaction.reply({ content: `✅ **${targetMember.user.tag}** a été rendu muet définitivement.`, ephemeral: true });
-            }
+            
+            } else if (action === 'traite') {
+                const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+                
+                // Vérifier permission (Tempmute min => Staff ou Haut Staff)
+                const STAFF_ROLE = '1471893729060192256';
+                if (!interaction.member.roles.cache.has(STAFF_ROLE) && !interaction.member.roles.cache.has(HIGH_STAFF_ROLE) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                    return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', ephemeral: true });
+                }
 
-            // Optionnel : Mettre à jour le message pour dire "Traité"
-            // await interaction.message.edit(...) 
+                const modal = new ModalBuilder()
+                    .setCustomId(`modal_signaler_traite_${targetId}`)
+                    .setTitle('Marquer comme traité');
+
+                const actionInput = new TextInputBuilder()
+                    .setCustomId('actionInput')
+                    .setLabel("Quelle action a été faite ?")
+                    .setStyle(TextInputStyle.Paragraph);
+
+                const firstActionRow = new ActionRowBuilder().addComponents(actionInput);
+                modal.addComponents(firstActionRow);
+
+                await interaction.showModal(modal);
+            }
 
         } catch (error) {
             console.error('Erreur action rapide signalement:', error);
-            await interaction.reply({ content: '❌ Une erreur est survenue lors de l\'application de la sanction.', ephemeral: true });
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: '❌ Une erreur est survenue lors de l\'application de la sanction.', ephemeral: true });
+            }
         }
+        return;
+    }
+
+    // Gestion du Modal Submit
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_signaler_traite_')) {
+        const targetId = interaction.customId.split('_')[3];
+        const actionDone = interaction.fields.getTextInputValue('actionInput');
+        const { EmbedBuilder } = require('discord.js');
+
+        const originalEmbed = interaction.message.embeds[0];
+        const newEmbed = new EmbedBuilder(originalEmbed.data);
+        
+        newEmbed.setColor(0x00FF00); // Vert pour Traité
+        newEmbed.addFields(
+            { name: '✅ Traité par', value: interaction.user.tag, inline: true },
+            { name: 'Action effectuée', value: actionDone, inline: true }
+        );
+        newEmbed.setTitle('Signalement Traité');
+
+        // On peut retirer les boutons ou les laisser, ici on les modifie pour désactiver "traité"
+        const components = interaction.message.components;
+        // Optionnel: désactiver les boutons pour éviter le spam, ou juste laisser tel quel
+        
+        await interaction.message.edit({ embeds: [newEmbed], components: [] }); 
+        await interaction.reply({ content: '✅ Signalement marqué comme traité.', ephemeral: true });
         return;
     }
 
