@@ -9,5 +9,12 @@
             "roleA": 1,
             "roleB": 5
         }
+    },
+    "test_debug": {
+        "users": [
+            "12345"
+        ],
+        "roles": [],
+        "roleLimits": {}
     }
 }

@@ -15,13 +15,14 @@ const USAGE_FILE = path.join(__dirname, '../../commandUsage.json');
 function loadPermissions() {
     try {
         if (!fs.existsSync(PERMISSIONS_FILE)) {
+            console.log('[PermHelper] Fichier permissions.json inexistant, création d\'un nouveau.');
             fs.writeFileSync(PERMISSIONS_FILE, JSON.stringify({}));
             return {};
         }
         const data = fs.readFileSync(PERMISSIONS_FILE, 'utf8');
         return JSON.parse(data);
     } catch (error) {
-        console.error('Erreur lors du chargement des permissions:', error);
+        console.error('[PermHelper] CRITICAL: Erreur lors du chargement des permissions:', error);
         return {};
     }
 }
@@ -38,19 +39,22 @@ function loadUsageData() {
         const data = fs.readFileSync(USAGE_FILE, 'utf8');
         return JSON.parse(data);
     } catch (error) {
-        console.error('Erreur lors du chargement des usages:', error);
+        console.error('[PermHelper] Erreur lors du chargement des usages:', error);
         return {};
     }
 }
 
 /**
- * Sauvegarde les permissions dans le fichier JSON
+ * Sauvegarde les permissions dans le fichier JSON de manière atomique
  */
 function savePermissions(perms) {
     try {
-        fs.writeFileSync(PERMISSIONS_FILE, JSON.stringify(perms, null, 4));
+        const tempFile = `${PERMISSIONS_FILE}.tmp`;
+        fs.writeFileSync(tempFile, JSON.stringify(perms, null, 4));
+        fs.renameSync(tempFile, PERMISSIONS_FILE);
+        console.log('[PermHelper] Permissions sauvegardées avec succès.');
     } catch (error) {
-        console.error('Erreur lors de la sauvegarde des permissions:', error);
+        console.error('[PermHelper] CRITICAL: Erreur lors de la sauvegarde des permissions:', error);
     }
 }
 
@@ -61,7 +65,7 @@ function saveUsageData(data) {
     try {
         fs.writeFileSync(USAGE_FILE, JSON.stringify(data, null, 4));
     } catch (error) {
-        console.error('Erreur lors de la sauvegarde des usages:', error);
+        console.error('[PermHelper] Erreur lors de la sauvegarde des usages:', error);
     }
 }
 
@@ -73,23 +77,28 @@ function saveUsageData(data) {
  * @param {number} [limit] (Optionnel) Limite d'utilisation pour le rôle avant qu'il ne soit retiré
  */
 function addPermission(commandName, type, id, limit) {
+    console.log(`[PermHelper] Tentative d'ajout de permission: Commande="${commandName}", Type="${type}", ID="${id}", Limit="${limit}"`);
     const perms = loadPermissions();
     if (!perms[commandName]) perms[commandName] = { users: [], roles: [], roleLimits: {} };
     
     if (type === 'user' && !perms[commandName].users.includes(id)) {
         perms[commandName].users.push(id);
+        console.log(`[PermHelper] Permission utilisateur ajoutée.`);
     } else if (type === 'role') {
         if (!perms[commandName].roles.includes(id)) {
             perms[commandName].roles.push(id);
+            console.log(`[PermHelper] Permission rôle ajoutée.`);
         }
         // Si une limite est définie, on l'ajoute/met à jour
         if (limit && limit > 0) {
             if (!perms[commandName].roleLimits) perms[commandName].roleLimits = {};
             perms[commandName].roleLimits[id] = limit;
+            console.log(`[PermHelper] Limite de rôle définie: ${limit}`);
         } else {
             // Si pas de limite, on retire une éventuelle limite existante
             if (perms[commandName].roleLimits && perms[commandName].roleLimits[id]) {
                 delete perms[commandName].roleLimits[id];
+                console.log(`[PermHelper] Limite de rôle supprimée.`);
             }
         }
     }
@@ -104,6 +113,7 @@ function addPermission(commandName, type, id, limit) {
  * @param {string} id ID de l'utilisateur ou du rôle
  */
 function removePermission(commandName, type, id) {
+    console.log(`[PermHelper] Tentative de retrait de permission: Commande="${commandName}", Type="${type}", ID="${id}"`);
     const perms = loadPermissions();
     if (!perms[commandName]) return;
 
