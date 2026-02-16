@@ -275,6 +275,7 @@ module.exports = {
     removePermission,
     checkPermission,
     checkAndConsumeRole,
+    loadPermissions,
 
     // Wrappers rétro-compatibles (mais idéalement on migrera vers checkPermission)
     isModChannel: (channelId) => channelId === MOD_CHANNEL_ID,
