@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Fichier JSON pour stocker les permissions dynamiques
-const PERMISSIONS_FILE = path.join(__dirname, '../../permissions.json');
+const PERMISSIONS_FILE = path.join(__dirname, '../../ajout-permissions.json');
 // Fichier JSON pour stocker l'utilisation des commandes (compteurs)
 const USAGE_FILE = path.join(__dirname, '../../commandUsage.json');
 
