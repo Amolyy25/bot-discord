@@ -75,6 +75,26 @@ const rest = new REST().setToken(process.env.TOKEN);
 // Snipe system
 const snipes = new Collection();
 
+// Système de Bienvenue
+client.on(Events.GuildMemberAdd, async (member) => {
+    const welcomeChannelId = '1469071691941412962'; // Salon Général
+    try {
+        const channel = await member.guild.channels.fetch(welcomeChannelId).catch(() => null);
+        if (!channel) return;
+
+        const { EmbedBuilder } = require('discord.js');
+        const embed = new EmbedBuilder()
+            .setTitle(`${member.user.username} à rejoint !`)
+            .setDescription(`Tu es le bienvenue, amuse-toi bien ici ! N'hésite pas à aller faire un tour ici <#1471901439713612005> et <#1472918469409509418>`)
+            .setImage('https://i.pinimg.com/originals/0c/b8/78/0cb8780082d2e46710a73f06c51285bb.gif')
+            .setColor(0xFFFFFF);
+
+        await channel.send({ embeds: [embed] });
+    } catch (error) {
+        console.error('Erreur lors de l\'envoi du message de bienvenue:', error);
+    }
+});
+
 client.on('messageDelete', async (message) => {
     if (message.author.bot || message.content.length === 0) return;
     
