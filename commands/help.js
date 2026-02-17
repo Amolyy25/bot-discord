@@ -18,7 +18,7 @@ module.exports = {
             fields: [
                 {
                     name: 'Utilitaires',
-                    value: '`-snipe` | `/snipe` - Message supprimé\n`-pic` | `/pic` - Photo de profil\n`-fake` | `/fake` - Détecter les fakes (Screen Google)\n`-userinfo` | `/userinfo` - Infos utilisateur\n`-serverinfo` | `/serverinfo` - Infos serveur\n`-roleinfo` | `/roleinfo` - Infos rôle\n`-ping` | `/ping` - Latence\n`-stats` | `/stats` - Statistiques serveur',
+                    value: '`-snipe` | `/snipe` - Message supprimé\n`-pic` | `/pic` - Photo de profil\n`-banner` | `/banner` - Bannière utilisateur\n`-fake` | `/fake` - Détecter les fakes (Screen Google)\n`-userinfo` | `/userinfo` - Infos utilisateur\n`-serverinfo` | `/serverinfo` - Infos serveur\n`-roleinfo` | `/roleinfo` - Infos rôle\n`-ping` | `/ping` - Latence\n`-stats` | `/stats` - Statistiques serveur',
                     inline: false
                 },
                 {
@@ -69,7 +69,7 @@ module.exports = {
             fields: [
                 {
                     name: 'Utilitaires',
-                    value: '`-snipe` | `/snipe` - Message supprimé\n`-pic` | `/pic` - Photo de profil\n`-fake` | `/fake` - Détecter les fakes (Screen Google)\n`-userinfo` | `/userinfo` - Infos utilisateur\n`-serverinfo` | `/serverinfo` - Infos serveur\n`-roleinfo` | `/roleinfo` - Infos rôle\n`-ping` | `/ping` - Latence\n`-stats` | `/stats` - Statistiques serveur',
+                    value: '`-snipe` | `/snipe` - Message supprimé\n`-pic` | `/pic` - Photo de profil\n`-banner` | `/banner` - Bannière utilisateur\n`-fake` | `/fake` - Détecter les fakes (Screen Google)\n`-userinfo` | `/userinfo` - Infos utilisateur\n`-serverinfo` | `/serverinfo` - Infos serveur\n`-roleinfo` | `/roleinfo` - Infos rôle\n`-ping` | `/ping` - Latence\n`-stats` | `/stats` - Statistiques serveur',
                     inline: false
                 },
                 {
