@@ -6,9 +6,9 @@ module.exports = {
         .setDescription('Affiche la latence du bot'),
 
     async execute(interaction) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
-        if (!isPerm3OrAdmin(interaction.member)) {
+        if (!checkPermission(interaction.member, 'ping')) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
         const sent = await interaction.reply({ content: '🏓 Pong!', fetchReply: true });
@@ -29,9 +29,9 @@ module.exports = {
     },
 
     async executeMessage(message) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
-        if (!isPerm3OrAdmin(message.member)) {
+        if (!checkPermission(message.member, 'ping')) {
             return message.reply('non ta pas la perm');
         }
         const sent = await message.channel.send('🏓 Pong!');

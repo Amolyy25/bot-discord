@@ -7,12 +7,12 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(interaction.member);
         
-        // On autorise si c'est un admin ou s'il a la perm 3 ET que ce n'est pas le salon de modé (sauf bypass admin)
+        // On autorise si c'est un admin ou s'il a la perm ET que ce n'est pas le salon de modé (sauf bypass admin)
         if (isModChannel(interaction.channelId) && !adminStatus) return;
-        if (!isPerm3OrAdmin(interaction.member)) {
+        if (!checkPermission(interaction.member, 'setup')) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
 
@@ -38,11 +38,11 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         const adminStatus = isAdmin(message.member);
         
         if (isModChannel(message.channel.id) && !adminStatus) return;
-        if (!isPerm3OrAdmin(message.member)) {
+        if (!checkPermission(message.member, 'setup')) {
             return message.reply('non ta pas la perm');
         }
 

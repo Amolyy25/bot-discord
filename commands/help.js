@@ -6,9 +6,9 @@ module.exports = {
         .setDescription('Affiche la liste des commandes du bot'),
 
     async execute(interaction) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
-        if (!isPerm3OrAdmin(interaction.member)) {
+        if (!checkPermission(interaction.member, 'help')) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
         const embed = {
@@ -57,9 +57,9 @@ module.exports = {
     },
 
     async executeMessage(message) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
-        if (!isPerm3OrAdmin(message.member)) {
+        if (!checkPermission(message.member, 'help')) {
             return message.reply('non ta pas la perm');
         }
         const embed = {

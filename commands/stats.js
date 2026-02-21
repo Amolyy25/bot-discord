@@ -6,9 +6,9 @@ module.exports = {
         .setDescription('Affiche les statistiques du serveur'),
 
     async execute(interaction) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
-        if (!isPerm3OrAdmin(interaction.member)) {
+        if (!checkPermission(interaction.member, 'stats')) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
         const { guild } = interaction;
@@ -42,9 +42,9 @@ module.exports = {
     },
 
     async executeMessage(message) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
-        if (!isPerm3OrAdmin(message.member)) {
+        if (!checkPermission(message.member, 'stats')) {
             return message.reply('non ta pas la perm');
         }
         const { guild } = message;
