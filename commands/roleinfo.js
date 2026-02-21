@@ -10,9 +10,9 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
-        if (!isPerm3OrAdmin(interaction.member)) {
+        if (!checkPermission(interaction.member, 'roleinfo')) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
         const role = interaction.options.getRole('rôle');
@@ -50,9 +50,9 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
-        if (!isPerm3OrAdmin(message.member)) {
+        if (!checkPermission(message.member, 'roleinfo')) {
             return message.reply('non ta pas la perm');
         }
         if (!args[0]) {
