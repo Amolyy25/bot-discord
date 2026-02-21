@@ -10,9 +10,10 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction, client, snipes) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
-        if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
-        if (!isPerm3OrAdmin(interaction.member)) {
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
+        const adminStatus = isAdmin(interaction.member);
+        if (isModChannel(interaction.channelId) && !adminStatus) return;
+        if (!checkPermission(interaction.member, 'snipe')) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
 
@@ -62,9 +63,10 @@ module.exports = {
     },
 
     async executeMessage(message, args, client, snipes) {
-        const { isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
-        if (isModChannel(message.channel.id) && !isAdmin(message.member)) return;
-        if (!isPerm3OrAdmin(message.member)) {
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
+        const adminStatus = isAdmin(message.member);
+        if (isModChannel(message.channel.id) && !adminStatus) return;
+        if (!checkPermission(message.member, 'snipe')) {
             return message.reply('non ta pas la perm');
         }
 

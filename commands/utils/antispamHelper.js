@@ -716,8 +716,9 @@ async function handleGuildMemberAdd(member) {
     return;
   }
 
-  // Ne pas appliquer auto-soumis aux staff (éviter de retirer leurs rôles)
-  if (isStaff(member)) return;
+  // Ne pas appliquer auto-soumis aux staff (via permissions dynamiques : si on a une commande générique "immune_antiraid" ou juste checkPermission admin)
+  const { checkPermission } = require('./permHelper');
+  if (checkPermission(member, 'immune_antiraid')) return; // Fallback dynamique
 
   // À ce stade : le membre rejoint via quelqu'un qui a été sanctionné récemment pour spam/insultes.
   await autoSoumisFromRaid(member, inviter, sourceInfo);
@@ -834,11 +835,9 @@ function isStaff(member) {
   if (!member) return false;
   if (member.permissions.has("Administrator")) return true;
 
-  // Check les rôles staff connus
-  const { ROLES } = require("./permHelper");
-  return [ROLES.STAFF, ROLES.STAFF_TEST, ROLES.PERM_3, ROLES.PERM_2].some(
-    (roleId) => member.roles.cache.has(roleId),
-  );
+  // Use dynamic permission from permHelper instead of hardcoded roles
+  const { checkPermission } = require('./permHelper');
+  return checkPermission(member, 'immune_spam');
 }
 
 // ═══════════════════════════════════════════════════════

@@ -247,17 +247,12 @@ function isAdmin(member) {
  * @param {string} commandName Nom de la commande
  * @param {Function} defaultCheck Fonction de vérification par défaut (ancienne logique)
  */
-function checkPermission(member, commandName, defaultCheck) {
+function checkPermission(member, commandName) {
     // 1. Admin a toujours accès
     if (isAdmin(member)) return true;
 
     // 2. Vérification dynamique (ajoutée via /addperm)
     if (hasDynamicPermission(member, commandName)) return true;
-
-    // 3. Fallback sur la logique codée en dur si fournie
-    if (defaultCheck && typeof defaultCheck === 'function') {
-        return defaultCheck(member);
-    }
 
     return false;
 }
@@ -277,14 +272,9 @@ module.exports = {
     checkAndConsumeRole,
     loadPermissions,
 
-    // Wrappers rétro-compatibles (mais idéalement on migrera vers checkPermission)
+    // Wrappers rétro-compatibles
     isModChannel: (channelId) => channelId === MOD_CHANNEL_ID,
 
-    isBoosterOrPerm2: (member) => checkPermission(member, 'booster_perm2', (m) => hasAnyRole(m, [ROLES.BOOSTER, ROLES.PERM_2, ROLES.PERM_3, ROLES.STAFF_TEST, ROLES.STAFF])),
-
-    isStaffTest: (member) => checkPermission(member, 'staff_test', (m) => hasAnyRole(m, [ROLES.STAFF_TEST, ROLES.STAFF])),
-
-    isStaff: (member) => checkPermission(member, 'staff', (m) => hasAnyRole(m, [ROLES.STAFF])),
-
-    isPerm3OrAdmin: (member) => checkPermission(member, 'perm3_admin', (m) => hasAnyRole(m, [ROLES.PERM_3, ROLES.STAFF_TEST, ROLES.STAFF]))
+    // On garde uniquement celui-ci car la consigne précise "à part le rôle BOOSTER qu'il faut laisser intact"
+    isBoosterOrPerm2: (member) => checkPermission(member, 'booster_perm2') || hasAnyRole(member, [ROLES.BOOSTER, ROLES.PERM_2, ROLES.PERM_3, ROLES.STAFF_TEST, ROLES.STAFF])
 };

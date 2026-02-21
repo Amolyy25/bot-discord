@@ -12,11 +12,10 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        const { checkPermission, isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         
-        // Vérification combinée : 'soumis' OU isPerm3OrAdmin
-        const hasPerm = checkPermission(interaction.member, 'soumis', isPerm3OrAdmin);
-        if (!hasPerm) {
+        // Vérification de permission
+        if (!checkPermission(interaction.member, 'soumis')) {
             return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
         }
 
@@ -75,11 +74,10 @@ module.exports = {
     },
 
     async executeMessage(message, args) {
-        const { checkPermission, isPerm3OrAdmin, isModChannel, isAdmin } = require('./utils/permHelper');
+        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         
-        // Vérification combinée : 'soumis' OU isPerm3OrAdmin
-        const hasPerm = checkPermission(message.member, 'soumis', isPerm3OrAdmin);
-        if (!hasPerm) {
+        // Vérification de permission
+        if (!checkPermission(message.member, 'soumis')) {
             return message.reply('non ta pas la perm');
         }
 
