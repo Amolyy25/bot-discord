@@ -33,7 +33,7 @@ module.exports = {
             return interaction.reply({ content: '❌ Vous devez être dans un salon vocal pour utiliser cette commande.', ephemeral: true });
         }
 
-        await interaction.guild.members.fetch();
+        // On utilise directement le cache pour éviter le Rate Limit (les membres en vocal sont toujours cachés par discord.js)
         const membersToMove = interaction.guild.members.cache.filter(m => m.voice.channelId && m.voice.channelId !== targetChannel.id);
         
         if (membersToMove.size === 0) {
@@ -86,7 +86,7 @@ module.exports = {
             return message.reply('❌ Vous devez être dans un salon vocal pour utiliser cette commande.');
         }
 
-        await message.guild.members.fetch();
+        // On utilise directement le cache pour éviter le Rate Limit
         const membersToMove = message.guild.members.cache.filter(m => m.voice.channelId && m.voice.channelId !== targetChannel.id);
         
         if (membersToMove.size === 0) {

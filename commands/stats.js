@@ -14,10 +14,8 @@ module.exports = {
         const { guild } = interaction;
 
         try {
-            // Fetch members to get accurate counts
-            await guild.members.fetch();
-            
             const totalMembers = guild.memberCount;
+            // Utiliser le cache existant au lieu de fetch tout le monde pour l'online count pour éviter les Rate Limits Discord
             const onlineMembers = guild.members.cache.filter(m => m.presence?.status === 'online' || m.presence?.status === 'dnd' || m.presence?.status === 'idle').size;
             const boostCount = guild.premiumSubscriptionCount || 0;
             const boostLevel = guild.premiumTier;
@@ -50,8 +48,6 @@ module.exports = {
         const { guild } = message;
 
         try {
-            await guild.members.fetch();
-            
             const totalMembers = guild.memberCount;
             const onlineMembers = guild.members.cache.filter(m => m.presence?.status === 'online' || m.presence?.status === 'dnd' || m.presence?.status === 'idle').size;
             const boostCount = guild.premiumSubscriptionCount || 0;
