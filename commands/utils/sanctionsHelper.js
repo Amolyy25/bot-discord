@@ -14,6 +14,11 @@ const INFRACTION_CONFIG = {
         '2': { label: 'Provocations répétés', duration: '1h' },
         '3': { label: 'Troll destructeur / Raid', duration: '6h' }
     },
+    'Mentions': {
+        '1': { label: 'Mentions abusives (< 5)', duration: '10m' },
+        '2': { label: 'Mentions abusives (5 - 10)', duration: '1h' },
+        '3': { label: 'Mass Mentions (> 10)', duration: '1d' }
+    },
     'Insulte': {
         '1': { label: 'Langage familier', duration: '10m' },
         '2': { label: 'Insulte directe', duration: '20m' },

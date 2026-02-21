@@ -159,7 +159,6 @@ async function startInteractiveMute(context, target, member) {
                             description: `Vous avez été rendu muet sur **${i.guild.name}**.`,
                             fields: [
                                 { name: 'Raison', value: selections.gravityLabel, inline: true },
-                                { name: 'Modérateur', value: user.tag, inline: true },
                                 { name: 'Durée', value: selections.duration, inline: true }
                             ],
                             timestamp: new Date()

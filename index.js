@@ -96,7 +96,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
 });
 
 client.on('messageDelete', async (message) => {
-    if (message.author.bot || message.content.length === 0) return;
+    if (!message.author || message.author.bot || !message.content || message.content.length === 0) return;
     
     if (!snipes.has(message.channel.id)) {
         snipes.set(message.channel.id, []);

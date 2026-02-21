@@ -140,6 +140,22 @@ async function startInteractiveWarn(context, target, member) {
             selections.gravityLabel = data.label;
         } else if (i.customId === 'confirm_warn') {
             try {
+                try {
+                    await target.send({
+                        embeds: [{
+                            color: 0xFFFF00,
+                            title: 'Sanction : Avertissement',
+                            description: `Vous avez reçu un avertissement sur **${i.guild.name}**.`,
+                            fields: [
+                                { name: 'Raison', value: selections.gravityLabel, inline: true }
+                            ],
+                            timestamp: new Date()
+                        }]
+                    });
+                } catch (err) {
+                    console.log(`Impossible d'envoyer un MP à ${target.tag}`);
+                }
+
                 addSanction(i.guild.id, target.id, 'warn', selections.level, user.tag, null, selections.category, selections.gravityLabel);
 
                 const { logModAction } = require('./utils/logHelper');
@@ -165,6 +181,7 @@ async function startInteractiveWarn(context, target, member) {
 
                 await i.update({ content: null, embeds: [finalEmbed], components: [] });
                 collector.stop();
+                return;
             } catch (error) {
                 console.error(error);
                 return i.reply({ content: 'Erreur lors de l\'application de la sanction!', ephemeral: true });
@@ -172,6 +189,7 @@ async function startInteractiveWarn(context, target, member) {
         } else if (i.customId === 'cancel_warn') {
             await i.update({ content: 'Sanction annulée.', embeds: [], components: [] });
             collector.stop();
+            return;
         }
 
         embed.fields[0].value = selections.category || 'Non sélectionnée';
