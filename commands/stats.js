@@ -1,5 +1,4 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const activity = require('./utils/activityHelper');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -22,23 +21,18 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = new EmbedBuilder()
-                .setColor(0xFFFFFF)
-                .setTitle(`: ̗̀➛ Stats - ${guild.name}`)
+                .setColor(0x5865F2)
+                .setTitle(`📊 Stats - ${guild.name}`)
                 .setThumbnail(guild.iconURL({ dynamic: true }))
                 .addFields(
-                    { name: 'Membres', value: `${totalMembers}`, inline: true },
-                    { name: 'En ligne', value: `${onlineMembers}`, inline: true },
-                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
+                    { name: '👥 Membres', value: `${totalMembers}`, inline: true },
+                    { name: '🟢 En ligne', value: `${onlineMembers}`, inline: true },
+                    { name: '🚀 Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
                 )
-                .setFooter({ text: 'LE SECTEUR STATISTIQUES' })
+                .setFooter({ text: 'Bot Discord - Statistiques' })
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
-
-            // Envoi du Top 3 d'activité
-            const topList = await activity.getTopActive(guild, 3);
-            const topEmbed = activity.createTopEmbed(topList, guild.name);
-            await interaction.followUp({ embeds: [topEmbed] });
         } catch (error) {
             console.error('Erreur stats:', error);
             await interaction.reply({ content: 'Une erreur est survenue lors de la récupération des statistiques.', ephemeral: true });
@@ -60,24 +54,19 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = {
-                color: 0xFFFFFF,
-                title: `: ̗̀➛ Stats - ${guild.name}`,
+                color: 0x5865F2,
+                title: `📊 Stats - ${guild.name}`,
                 thumbnail: { url: guild.iconURL({ dynamic: true }) },
                 fields: [
-                    { name: 'Membres', value: `${totalMembers}`, inline: true },
-                    { name: 'En ligne', value: `${onlineMembers}`, inline: true },
-                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
+                    { name: '👥 Membres', value: `${totalMembers}`, inline: true },
+                    { name: '🟢 En ligne', value: `${onlineMembers}`, inline: true },
+                    { name: '🚀 Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
                 ],
-                footer: { text: 'LE SECTEUR STATISTIQUES' },
+                footer: { text: 'Bot Discord - Statistiques' },
                 timestamp: new Date().toISOString()
             };
 
             await message.reply({ embeds: [embed] });
-
-            // Envoi du Top 3 d'activité
-            const topList = await activity.getTopActive(guild, 3);
-            const topEmbed = activity.createTopEmbed(topList, guild.name);
-            await message.channel.send({ embeds: [topEmbed] });
         } catch (error) {
             console.error('Erreur stats:', error);
             await message.reply('Une erreur est survenue lors de la récupération des statistiques.');
