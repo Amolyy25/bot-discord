@@ -80,18 +80,16 @@ function resetMonthlyStats() {
 function createTopEmbed(topList, guildName) {
     const embed = new EmbedBuilder()
         .setColor(0x00AE86)
-        .setTitle(`🏆 Top 3 des membres les plus actifs - ${guildName}`)
+        .setTitle(`Top 3 - ${guildName}`)
         .setDescription('Félicitations aux membres les plus actifs ce mois-ci ! 🚀')
         .setTimestamp();
 
     if (topList.length === 0) {
         embed.setDescription('Aucune activité enregistrée pour le moment.');
     } else {
-        const medalEmojis = ['🥇', '🥈', '🥉'];
         let description = '';
         topList.forEach((user, index) => {
-            const medal = medalEmojis[index] || '🔹';
-            description += `${medal} **${user.name}** : ${user.count} messages\n`;
+            description += `${user.name} : ${user.count} messages\n`;
         });
         embed.setDescription(description);
     }

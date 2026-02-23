@@ -22,7 +22,7 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = new EmbedBuilder()
-                .setColor(0x000000)
+                .setColor(0xFFFFFF)
                 .setTitle(`: ̗̀➛ Stats - ${guild.name}`)
                 .setThumbnail(guild.iconURL({ dynamic: true }))
                 .addFields(
@@ -30,8 +30,7 @@ module.exports = {
                     { name: 'En ligne', value: `${onlineMembers}`, inline: true },
                     { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
                 )
-                .setImage('https://i.pinimg.com/originals/a0/9f/11/a09f11eab6b1ddc4b510085bd7f039ea.gif')
-                .setFooter({ text: 'Bot Discord - Statistiques' })
+                .setFooter({ text: 'LE SECTEUR STATISTIQUES' })
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
@@ -61,7 +60,7 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = {
-                color: 0x000000,
+                color: 0xFFFFFF,
                 title: `: ̗̀➛ Stats - ${guild.name}`,
                 thumbnail: { url: guild.iconURL({ dynamic: true }) },
                 fields: [
@@ -69,8 +68,7 @@ module.exports = {
                     { name: 'En ligne', value: `${onlineMembers}`, inline: true },
                     { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
                 ],
-                image: { url: 'https://i.pinimg.com/originals/a0/9f/11/a09f11eab6b1ddc4b510085bd7f039ea.gif' },
-                footer: { text: 'Bot Discord - Statistiques' },
+                footer: { text: 'LE SECTEUR STATISTIQUES' },
                 timestamp: new Date().toISOString()
             };
 
