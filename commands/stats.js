@@ -22,14 +22,15 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = new EmbedBuilder()
-                .setColor(0xFFFF)
-                .setTitle(`: ̗̀➛Stats - ${guild.name}`)
+                .setColor(0x000000)
+                .setTitle(`: ̗̀➛ Stats - ${guild.name}`)
                 .setThumbnail(guild.iconURL({ dynamic: true }))
                 .addFields(
-                    { name: 'Membres', value: `${totalMembers}`, inline: false },
-                    { name: 'En ligne', value: `${onlineMembers}`, inline: false },
-                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: false }
+                    { name: 'Membres', value: `${totalMembers}`, inline: true },
+                    { name: 'En ligne', value: `${onlineMembers}`, inline: true },
+                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
                 )
+                .setImage('https://i.pinimg.com/originals/a0/9f/11/a09f11eab6b1ddc4b510085bd7f039ea.gif')
                 .setFooter({ text: 'Bot Discord - Statistiques' })
                 .setTimestamp();
 
@@ -60,14 +61,15 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = {
-                color: 0xFFFF,
+                color: 0x000000,
                 title: `: ̗̀➛ Stats - ${guild.name}`,
                 thumbnail: { url: guild.iconURL({ dynamic: true }) },
                 fields: [
-                    { name: 'Membres', value: `${totalMembers}`, inline: false },
-                    { name: 'En ligne', value: `${onlineMembers}`, inline: false },
-                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: false }
+                    { name: 'Membres', value: `${totalMembers}`, inline: true },
+                    { name: 'En ligne', value: `${onlineMembers}`, inline: true },
+                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
                 ],
+                image: { url: 'https://i.pinimg.com/originals/a0/9f/11/a09f11eab6b1ddc4b510085bd7f039ea.gif' },
                 footer: { text: 'Bot Discord - Statistiques' },
                 timestamp: new Date().toISOString()
             };

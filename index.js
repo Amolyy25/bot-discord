@@ -427,14 +427,15 @@ client.once(Events.ClientReady, () => {
             const boostLevel = guild.premiumTier;
 
             const embed = {
-                color: 0XFFFF,
+                color: 0x000000,
                 title: `: ̗̀➛ Rapport Quotidien - ${guild.name}`,
                 thumbnail: { url: guild.iconURL({ dynamic: true }) },
                 fields: [
-                    { name: 'Membres', value: `${totalMembers}`, inline: false },
-                    { name: 'Actuellement en ligne', value: `${onlineMembers}`, inline: false },
-                    { name: 'Niveau de Boost', value: `${boostCount} (Niveau ${boostLevel})`, inline: false }
+                    { name: 'Membres', value: `${totalMembers}`, inline: true },
+                    { name: 'Actuellement en ligne', value: `${onlineMembers}`, inline: true },
+                    { name: 'Niveau de Boost', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
                 ],
+                image: { url: 'https://i.pinimg.com/originals/a0/9f/11/a09f11eab6b1ddc4b510085bd7f039ea.gif' },
                 footer: { text: 'Stats quotidiennes (9:00)' },
                 timestamp: new Date().toISOString()
             };
