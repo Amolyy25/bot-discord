@@ -22,13 +22,13 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle(`Stats - ${guild.name}`)
+                .setColor(0xFFFF)
+                .setTitle(`: ̗̀➛Stats - ${guild.name}`)
                 .setThumbnail(guild.iconURL({ dynamic: true }))
                 .addFields(
-                    { name: 'Membres', value: `${totalMembers}`, inline: true },
-                    { name: 'En ligne', value: `${onlineMembers}`, inline: true },
-                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
+                    { name: 'Membres', value: `${totalMembers}`, inline: false },
+                    { name: 'En ligne', value: `${onlineMembers}`, inline: false },
+                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: false }
                 )
                 .setFooter({ text: 'Bot Discord - Statistiques' })
                 .setTimestamp();
@@ -60,13 +60,13 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = {
-                color: 0x5865F2,
-                title: `Stats - ${guild.name}`,
+                color: 0xFFFF,
+                title: `: ̗̀➛ Stats - ${guild.name}`,
                 thumbnail: { url: guild.iconURL({ dynamic: true }) },
                 fields: [
-                    { name: 'Membres', value: `${totalMembers}`, inline: true },
-                    { name: 'En ligne', value: `${onlineMembers}`, inline: true },
-                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
+                    { name: 'Membres', value: `${totalMembers}`, inline: false },
+                    { name: 'En ligne', value: `${onlineMembers}`, inline: false },
+                    { name: 'Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: false }
                 ],
                 footer: { text: 'Bot Discord - Statistiques' },
                 timestamp: new Date().toISOString()
