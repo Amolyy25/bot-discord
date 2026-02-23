@@ -7,6 +7,7 @@ const cron = require('node-cron');
 const statsCommand = require('./commands/stats.js');
 const antispam = require('./commands/utils/antispamHelper');
 const jackpot = require('./commands/utils/jackpotHelper');
+const activity = require('./commands/utils/activityHelper');
 
 // Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
 const PORT = process.env.PORT || 8080;
@@ -320,6 +321,9 @@ client.on('messageCreate', async message => {
     if (message.author.bot) return;
 
     // ══ Anti-Spam / Anti-Raid ══
+    // Tracking activité
+    activity.trackMessage(message.author.id);
+
     // Vérifie AVANT tout le reste (priorité haute)
     const handled = await antispam.handleMessage(message);
     if (handled) return; // Message traité par l'anti-spam, on arrête là
@@ -423,23 +427,37 @@ client.once(Events.ClientReady, () => {
             const boostLevel = guild.premiumTier;
 
             const embed = {
-                color: 0x5865F2,
-                title: `📊 Rapport Quotidien - ${guild.name}`,
+                color: 0XFFFF,
+                title: `: ̗̀➛ Rapport Quotidien - ${guild.name}`,
                 thumbnail: { url: guild.iconURL({ dynamic: true }) },
                 fields: [
-                    { name: '👥 Membres Totaux', value: `${totalMembers}`, inline: true },
-                    { name: '🟢 Actuellement en ligne', value: `${onlineMembers}`, inline: true },
-                    { name: '🚀 Niveau de Boost', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
+                    { name: 'Membres', value: `${totalMembers}`, inline: false },
+                    { name: 'Actuellement en ligne', value: `${onlineMembers}`, inline: false },
+                    { name: 'Niveau de Boost', value: `${boostCount} (Niveau ${boostLevel})`, inline: false }
                 ],
                 footer: { text: 'Stats quotidiennes (9:00)' },
                 timestamp: new Date().toISOString()
             };
 
             await channel.send({ embeds: [embed] });
-            console.log('Stats envoyées avec succès à 9h00');
+
+            // Envoi du Top 3 d'activité (Deuxième message)
+            const topList = await activity.getTopActive(guild, 3);
+            const topEmbed = activity.createTopEmbed(topList, guild.name);
+            await channel.send({ embeds: [topEmbed] });
+
+            console.log('Stats et Top 3 envoyés avec succès à 9h00');
         } catch (error) {
             console.error('Erreur lors de l\'envoi des stats cron:', error);
         }
+    }, {
+        timezone: "Europe/Paris"
+    });
+
+    // Cron job pour le reset mensuel (1er du mois à 00:00)
+    cron.schedule('0 0 1 * *', async () => {
+        console.log('Réinitialisation mensuelle des statistiques d\'activité...');
+        activity.resetMonthlyStats();
     }, {
         timezone: "Europe/Paris"
     });
