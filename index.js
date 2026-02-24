@@ -295,6 +295,30 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    // Gestion des boutons de rôles
+    if (interaction.isButton() && interaction.customId.startsWith('role_')) {
+        const roleId = interaction.customId.split('_')[1];
+        const role = interaction.guild.roles.cache.get(roleId);
+
+        if (!role) {
+            return interaction.reply({ content: '❌ Ce rôle n\'existe plus.', ephemeral: true });
+        }
+
+        try {
+            if (interaction.member.roles.cache.has(roleId)) {
+                await interaction.member.roles.remove(roleId);
+                await interaction.reply({ content: `✅ Le rôle **${role.name}** vous a été retiré.`, ephemeral: true });
+            } else {
+                await interaction.member.roles.add(roleId);
+                await interaction.reply({ content: `✅ Le rôle **${role.name}** vous a été attribué.`, ephemeral: true });
+            }
+        } catch (error) {
+            console.error('Erreur lors du changement de rôle:', error);
+            await interaction.reply({ content: '❌ Impossible de modifier vos rôles. Vérifiez mes permissions.', ephemeral: true });
+        }
+        return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const command = client.commands.get(interaction.commandName);
