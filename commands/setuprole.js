@@ -84,7 +84,29 @@ module.exports = {
             rows.push(row);
         }
 
+        // Embed Autres
+        const embedAutres = new EmbedBuilder()
+            .setTitle('<a:owner:1473355068127445033> Rôles Divers')
+            .setDescription('*→ Sélectionnez les rôles additionnels que vous souhaitez avoir*')
+            .setColor(0xFFFFFF);
+
+        const rowAutres = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('role_1475912347418759219')
+                .setLabel('Event')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('role_1471790345082896437')
+                .setLabel('Jeux')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('role_1472918018970484872')
+                .setLabel('Communautaire')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
         await targetChannel.send({ embeds: [embedPings], components: [rowPings] });
         await targetChannel.send({ embeds: [embedGames], components: rows });
+        await targetChannel.send({ embeds: [embedAutres], components: [rowAutres] });
     }
 };
