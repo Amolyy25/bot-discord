@@ -89,7 +89,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
             .setImage('https://i.pinimg.com/originals/0c/b8/78/0cb8780082d2e46710a73f06c51285bb.gif')
             .setColor(0xFFFFFF);
 
-        await channel.send({ embeds: [embed] });
+        await channel.send({ content: `<@${member.id}>`, embeds: [embed] });
     } catch (error) {
         console.error('Erreur lors de l\'envoi du message de bienvenue:', error);
     }
