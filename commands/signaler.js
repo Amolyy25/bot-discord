@@ -112,15 +112,15 @@ module.exports = {
         const row1 = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`signaler_tempmute_10m_${targetUser.id}`)
+                    .setCustomId(`signaler_tempmute_10m_${targetUser.id}_${message.author.id}`)
                     .setLabel('Tempmute 10m')
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
-                    .setCustomId(`signaler_tempmute_15m_${targetUser.id}`)
+                    .setCustomId(`signaler_tempmute_15m_${targetUser.id}_${message.author.id}`)
                     .setLabel('Tempmute 15m')
                     .setStyle(ButtonStyle.Secondary),
                  new ButtonBuilder()
-                    .setCustomId(`signaler_tempmute_30m_${targetUser.id}`)
+                    .setCustomId(`signaler_tempmute_30m_${targetUser.id}_${message.author.id}`)
                     .setLabel('Tempmute 30m')
                     .setStyle(ButtonStyle.Secondary)
             );
@@ -128,24 +128,36 @@ module.exports = {
         const row2 = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`signaler_ban_${targetUser.id}`)
+                    .setCustomId(`signaler_ban_${targetUser.id}_${message.author.id}`)
                     .setLabel('Ban')
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
-                    .setCustomId(`signaler_mute_${targetUser.id}`)
+                    .setCustomId(`signaler_mute_${targetUser.id}_${message.author.id}`)
                     .setLabel('Mute Def')
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
-                    .setCustomId(`signaler_traite_${targetUser.id}`)
-                    .setLabel('Marquer comme traité')
+                    .setCustomId(`signaler_traite_${targetUser.id}_${message.author.id}`)
+                    .setLabel('Traiter')
                     .setStyle(ButtonStyle.Success)
+            );
+
+        const row3 = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`signaler_ticket_${targetUser.id}_${message.author.id}`)
+                    .setLabel('Créer un ticket')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId(`signaler_abus_${message.author.id}`)
+                    .setLabel('Signaler comme abus')
+                    .setStyle(ButtonStyle.Danger)
             );
 
         // 6. Envoyer le log
         try {
             const reportChannel = await client.channels.fetch(reportChannelId);
             if (reportChannel) {
-                await reportChannel.send({ embeds: [reportEmbed], components: [row1, row2] });
+                await reportChannel.send({ embeds: [reportEmbed], components: [row1, row2, row3] });
             } else {
                 console.error(`Salon de signalement introuvable: ${reportChannelId}`);
                 return message.reply('Erreur interne : salon de logs introuvable.');

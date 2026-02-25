@@ -135,48 +135,54 @@ client.on('interactionCreate', async interaction => {
     // Gestion des boutons du système de signalement
     if (interaction.isButton() && interaction.customId.startsWith('signaler_')) {
         const parts = interaction.customId.split('_');
-        const action = parts[1]; // tempmute, ban, mute
+        const action = parts[1]; // tempmute, ban, mute, traite, ticket, abus
         
-        // Extraction de l'ID selon le format
-        let targetId;
-        if (action === 'tempmute') {
-            targetId = parts[3];
-        } else {
-            targetId = parts[2];
+        // Nouvelles permissions demandées
+        const PERM_TEMPMUTE = '1469071689831940310'; // Minimum pour tempmute/ticket
+        const PERM_BAN = '1469071689831940309';      // Tout faire (incluant ban)
+        const PERM_MUTE_DEF = '1469071689831940308'; // Tout faire sauf ban
+
+        const { PermissionFlagsBits, ChannelType, OverwriteType } = require('discord.js');
+        const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+        
+        const canBan = isAdmin || interaction.member.roles.cache.has(PERM_BAN);
+        const canMuteDef = canBan || interaction.member.roles.cache.has(PERM_MUTE_DEF);
+        const canStaff = canMuteDef || interaction.member.roles.cache.has(PERM_TEMPMUTE);
+
+        // Vérification des permissions selon l'action
+        if (action === 'ban' && !canBan) {
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de bannir (Role requis: 1469071689831940309).', flags: 64 });
+        }
+        if (action === 'mute' && !canMuteDef) {
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de mute définitif (Role requis: 1469071689831940308).', flags: 64 });
+        }
+        if (!canStaff) {
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de modérer (Role minimum requis: 1469071689831940310).', flags: 64 });
         }
 
-        // Rôle requis pour Ban et Mute Def
-        const HIGH_STAFF_ROLE = '1471886110434132137';
-        
-        const { PermissionFlagsBits } = require('discord.js');
+        // Extraction des IDs
+        let targetId, reporterId;
+        if (action === 'tempmute') {
+            targetId = parts[3];
+            reporterId = parts[4];
+        } else if (action === 'abus') {
+            reporterId = parts[2];
+        } else {
+            targetId = parts[2];
+            reporterId = parts[3];
+        }
+
         const { addSanction } = require('./commands/utils/sanctionsHelper');
         const { logModAction } = require('./commands/utils/logHelper');
         const { setMutedState } = require('./commands/utils/antispamHelper');
 
-        // Vérification des permissions
-        if (action === 'ban' || action === 'mute') {
-            if (!interaction.member.roles.cache.has(HIGH_STAFF_ROLE) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return interaction.reply({ content: '❌ Vous n\'avez pas la permission requise (Haut Staff).', flags: 64 });
-            }
-        } else if (action === 'tempmute') {
-             // Pour tempmute, on accepte le rôle Staff (1471893729060192256) ou Haut Staff
-             const STAFF_ROLE = '1471893729060192256';
-             if (!interaction.member.roles.cache.has(STAFF_ROLE) && !interaction.member.roles.cache.has(HIGH_STAFF_ROLE)) {
-                return interaction.reply({ content: '❌ Vous n\'avez pas la permission de modérer.', flags: 64 });
-             }
-        }
-
-        const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
-        if (!targetMember && action !== 'ban') { // On peut bannir par ID
-             return interaction.reply({ content: '❌ Utilisateur introuvable ou parti du serveur.', flags: 64 });
-        }
-
         try {
             if (action === 'tempmute') {
-                const durationType = parts[2]; // 10m, 15m, 30m
+                const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
+                if (!targetMember) return interaction.reply({ content: '❌ Utilisateur introuvable.', flags: 64 });
 
-                let durationMs;
-                let durationLabel;
+                const durationType = parts[2]; // 10m, 15m, 30m
+                let durationMs, durationLabel;
                 switch (durationType) {
                     case '10m': durationMs = 10 * 60 * 1000; durationLabel = '10 minutes'; break;
                     case '15m': durationMs = 15 * 60 * 1000; durationLabel = '15 minutes'; break;
@@ -185,17 +191,6 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 await targetMember.timeout(durationMs, `Signalement - Action rapide par ${interaction.user.tag}`);
-                
-                // Muted Role
-                const mutedRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
-                if (mutedRole) {
-                    await targetMember.roles.add(mutedRole).catch(() => {});
-                    setMutedState(targetId);
-                    setTimeout(() => {
-                        targetMember.roles.remove(mutedRole).catch(() => {});
-                    }, durationMs);
-                }
-
                 addSanction(interaction.guild.id, targetId, 'tempmute', '2', interaction.user.tag, 'Via Signalement', 'Autre', `Tempmute ${durationLabel}`, durationType);
                 
                 await logModAction(interaction.guild, {
@@ -210,14 +205,10 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ content: `✅ **${targetMember.user.tag}** a été rendu muet pour ${durationLabel}.`, flags: 64 });
 
             } else if (action === 'ban') {
-                // parts[2] est l'ID
                 await interaction.guild.bans.create(targetId, { reason: `Signalement - Action rapide par ${interaction.user.tag}` });
-                
                 addSanction(interaction.guild.id, targetId, 'ban', '3', interaction.user.tag, 'Via Signalement', 'Autre', 'Bannissement', 'permanent');
-                 
-                // On essaie de fetch user pour le log
+                
                 const targetUserObj = await client.users.fetch(targetId).catch(() => ({ tag: 'Inconnu', id: targetId }));
-
                 await logModAction(interaction.guild, {
                     action: 'BAN',
                     moderator: interaction.user,
@@ -230,14 +221,11 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ content: `✅ **${targetUserObj.tag || targetId}** a été banni.`, flags: 64 });
 
             } else if (action === 'mute') {
-                 // Mute Def
+                 const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
                  if (!targetMember) return interaction.reply({ content: '❌ Utilisateur introuvable.', flags: 64 });
 
-                 const mutedRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
-                 if (mutedRole) await targetMember.roles.add(mutedRole).catch(() => {});
-                 
                  setMutedState(targetId);
-                 await targetMember.timeout(28 * 24 * 60 * 60 * 1000, `Signalement - Mute Def par ${interaction.user.tag}`); // Max timeout ~28 jours
+                 await targetMember.timeout(28 * 24 * 60 * 60 * 1000, `Signalement - Mute Def par ${interaction.user.tag}`);
 
                  addSanction(interaction.guild.id, targetId, 'mute', '3', interaction.user.tag, 'Via Signalement', 'Autre', 'Mute Définitif', 'permanent');
 
@@ -254,13 +242,6 @@ client.on('interactionCreate', async interaction => {
             
             } else if (action === 'traite') {
                 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
-                
-                // Vérifier permission (Tempmute min => Staff ou Haut Staff)
-                const STAFF_ROLE = '1471893729060192256';
-                if (!interaction.member.roles.cache.has(STAFF_ROLE) && !interaction.member.roles.cache.has(HIGH_STAFF_ROLE) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                    return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', flags: 64 });
-                }
-
                 const modal = new ModalBuilder()
                     .setCustomId(`modal_signaler_traite_${targetId}`)
                     .setTitle('Marquer comme traité');
@@ -272,14 +253,80 @@ client.on('interactionCreate', async interaction => {
 
                 const firstActionRow = new ActionRowBuilder().addComponents(actionInput);
                 modal.addComponents(firstActionRow);
-
                 await interaction.showModal(modal);
+
+            } else if (action === 'abus') {
+                const reporterMember = await interaction.guild.members.fetch(reporterId).catch(() => null);
+                if (!reporterMember) return interaction.reply({ content: '❌ Signaleur introuvable.', flags: 64 });
+
+                const abuseDuration = 20 * 60 * 1000; // 20 minutes
+                await reporterMember.timeout(abuseDuration, `Abus de la commande -signaler - Action par ${interaction.user.tag}`);
+                
+                addSanction(interaction.guild.id, reporterId, 'tempmute', '1', interaction.user.tag, 'Abus Signalement', 'Autre', 'Mute 20m pour abus de signalement', '20m');
+
+                await logModAction(interaction.guild, {
+                    action: 'ABUS SIGNALEMENT',
+                    moderator: interaction.user,
+                    target: reporterMember.user,
+                    reason: 'Abus de la commande -signaler',
+                    details: 'Mute 20 minutes',
+                    color: 0xFF0000
+                });
+
+                await interaction.reply({ content: `✅ **${reporterMember.user.tag}** a été mute 20m pour abus de la commande.`, flags: 64 });
+
+            } else if (action === 'ticket') {
+                const targetUserObj = await client.users.fetch(targetId).catch(() => null);
+                const reporterUserObj = await client.users.fetch(reporterId).catch(() => null);
+                
+                if (!targetUserObj || !reporterUserObj) return interaction.reply({ content: '❌ Impossible de récupérer les utilisateurs pour le ticket.', flags: 64 });
+
+                const ticketChannel = await interaction.guild.channels.create({
+                    name: `ticket-${targetUserObj.username}`,
+                    type: ChannelType.GuildText,
+                    permissionOverwrites: [
+                        {
+                            id: interaction.guild.id,
+                            deny: [PermissionFlagsBits.ViewChannel],
+                        },
+                        {
+                            id: targetId,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                        },
+                        {
+                            id: reporterId,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                        },
+                        {
+                            id: interaction.user.id,
+                            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                        },
+                        // On autorise aussi les rôles staff à voir
+                        { id: PERM_TEMPMUTE, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+                        { id: PERM_MUTE_DEF, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+                        { id: PERM_BAN, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+                    ],
+                    reason: `Création de ticket de signalement par ${interaction.user.tag}`
+                });
+
+                await ticketChannel.send({
+                    content: `<@${targetId}> <@${reporterId}> <@${interaction.user.id}>`,
+                    embeds: [
+                        new EmbedBuilder()
+                            .setTitle('Ticket de Signalement')
+                            .setDescription(`Ce ticket a été ouvert par <@${interaction.user.id}> pour discuter du signalement concernant <@${targetId}> fait par <@${reporterId}>.\n\nMerci d'expliquer le problème calmement ici.`)
+                            .setColor(0xFFFFFF)
+                            .setTimestamp()
+                    ]
+                });
+
+                await interaction.reply({ content: `✅ Ticket créé : ${ticketChannel}`, flags: 64 });
             }
 
         } catch (error) {
             console.error('Erreur action rapide signalement:', error);
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: '❌ Une erreur est survenue lors de l\'application de la sanction.', flags: 64 });
+                await interaction.reply({ content: '❌ Une erreur est survenue lors de l\'application de l\'action.', flags: 64 });
             }
         }
         return;
