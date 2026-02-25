@@ -281,6 +281,8 @@ client.on('interactionCreate', async interaction => {
                 
                 if (!targetUserObj || !reporterUserObj) return interaction.reply({ content: '❌ Impossible de récupérer les utilisateurs pour le ticket.', flags: 64 });
 
+                const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
                 const ticketChannel = await interaction.guild.channels.create({
                     name: `ticket-${targetUserObj.username}`,
                     type: ChannelType.GuildText,
@@ -301,13 +303,19 @@ client.on('interactionCreate', async interaction => {
                             id: interaction.user.id,
                             allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
                         },
-                        // On autorise aussi les rôles staff à voir
-                        { id: PERM_TEMPMUTE, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+                        // On n'autorise PAS le rôle PERM_TEMPMUTE (310)
                         { id: PERM_MUTE_DEF, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
                         { id: PERM_BAN, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
                     ],
                     reason: `Création de ticket de signalement par ${interaction.user.tag}`
                 });
+
+                const closeRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`ticket_close_${interaction.user.id}`)
+                        .setLabel('Fermer le ticket')
+                        .setStyle(ButtonStyle.Danger)
+                );
 
                 await ticketChannel.send({
                     content: `<@${targetId}> <@${reporterId}> <@${interaction.user.id}>`,
@@ -317,7 +325,8 @@ client.on('interactionCreate', async interaction => {
                             .setDescription(`Ce ticket a été ouvert par <@${interaction.user.id}> pour discuter du signalement concernant <@${targetId}> fait par <@${reporterId}>.\n\nMerci d'expliquer le problème calmement ici.`)
                             .setColor(0xFFFFFF)
                             .setTimestamp()
-                    ]
+                    ],
+                    components: [closeRow]
                 });
 
                 await interaction.reply({ content: `✅ Ticket créé : ${ticketChannel}`, flags: 64 });
@@ -329,6 +338,23 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ content: '❌ Une erreur est survenue lors de l\'application de l\'action.', flags: 64 });
             }
         }
+        return;
+    }
+
+    // Gestion fermeture ticket
+    if (interaction.isButton() && interaction.customId.startsWith('ticket_close_')) {
+        const openerId = interaction.customId.split('_')[2];
+        const { PermissionFlagsBits } = require('discord.js');
+        
+        // Seul l'ouvreur ou un admin peut fermer
+        if (interaction.user.id !== openerId && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: '❌ Seul le membre du staff ayant ouvert ce ticket (ou un administrateur) peut le fermer.', flags: 64 });
+        }
+
+        await interaction.reply({ content: 'Fermeture du ticket dans 5 secondes...' });
+        setTimeout(() => {
+            interaction.channel.delete().catch(() => {});
+        }, 5000);
         return;
     }
 
