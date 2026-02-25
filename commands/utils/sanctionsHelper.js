@@ -33,6 +33,11 @@ const INFRACTION_CONFIG = {
         '1': { label: 'Infraction mineure', duration: '5m' },
         '2': { label: 'Infraction notable', duration: '30m' },
         '3': { label: 'Infraction majeure', duration: '4h' }
+    },
+    'Politique': {
+        '1': { label: 'Débats politiques', duration: '15m' },
+        '2': { label: 'Propagande / Militantisme', duration: '1h' },
+        '3': { label: 'Propos extrêmes / Incitation', duration: '4h' }
     }
 };
 
