@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -83,14 +83,12 @@ client.on(Events.GuildMemberAdd, async (member) => {
         const channel = await member.guild.channels.fetch(welcomeChannelId).catch(() => null);
         if (!channel) return;
 
-        const { EmbedBuilder } = require('discord.js');
         const embed = new EmbedBuilder()
-            .setTitle(`${member.user.username} à rejoint !`)
-            .setDescription(`Tu es le bienvenue, amuse-toi bien ici ! N'hésite pas à aller faire un tour ici <#1471901439713612005> et <#1472918469409509418>`)
-            .setImage('https://i.pinimg.com/originals/0c/b8/78/0cb8780082d2e46710a73f06c51285bb.gif')
+            .setTitle(`${member.user.username} a rejoint !`)
+            .setDescription(`*Tu es le bienvenu, amuse-toi bien ici ! Pour obtenir un boost d'xp x2 pendant 1 semaine et le <@&1471431323645378766> envoie ton premier message dans le chat !*`)
             .setColor(0xFFFFFF);
 
-        await channel.send({ content: `<@${member.id}>`, embeds: [embed] });
+        await channel.send({ content: `<@${member.id}> <@&1476171525471076536>`, embeds: [embed] });
     } catch (error) {
         console.error('Erreur lors de l\'envoi du message de bienvenue:', error);
     }
@@ -349,6 +347,41 @@ client.on('messageCreate', async message => {
     const handled = await antispam.handleMessage(message);
     if (handled) return; // Message traité par l'anti-spam, on arrête là
 
+    // Gestion du premier message dans le salon général
+    const welcomeChannelId = '1469071691941412962';
+    if (message.channelId === welcomeChannelId) {
+        const xpBoostRole = '1471887140882092104'; // Role XP x2 - Wait I need to check the exact ID from user promptly.. wait user gave: x2 xp <@&1471431323645378766> and the other <@&1476171525471076536>
+        const roleX2 = '1471431323645378766';
+        const roleOther = '1476171525471076536';
+        
+        const xpBoostsFile = path.join(__dirname, 'xpBoosts.json');
+        let xpData = {};
+        if (fs.existsSync(xpBoostsFile)) {
+            try {
+                xpData = JSON.parse(fs.readFileSync(xpBoostsFile, 'utf8'));
+            } catch (err) {
+                console.error('Error reading xpBoosts.json:', err);
+            }
+        }
+        
+        if (!xpData[message.author.id]) {
+            // C'est le premier message enregistré dans général
+            xpData[message.author.id] = {
+                expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 1 week
+            };
+            fs.writeFileSync(xpBoostsFile, JSON.stringify(xpData, null, 2));
+
+            const member = message.member;
+            if (member) {
+                try {
+                    await member.roles.add([roleX2, roleOther]);
+                } catch (err) {
+                    console.error('Error adding first message roles:', err);
+                }
+            }
+        }
+    }
+
     // Logique de Mirror (Troll)
     if (global.mirroredUsers && global.mirroredUsers.has(message.author.id)) {
         const expiration = global.mirroredUsers.get(message.author.id);
@@ -428,6 +461,41 @@ client.once(Events.ClientReady, () => {
         jackpot.checkCron(client);
     }, {
         timezone: "Europe/Paris"
+    });
+
+    // Cron job pour retirer le rôle xp x2
+    cron.schedule('0 * * * *', async () => {
+        const xpBoostsFile = path.join(__dirname, 'xpBoosts.json');
+        if (!fs.existsSync(xpBoostsFile)) return;
+
+        try {
+            const xpData = JSON.parse(fs.readFileSync(xpBoostsFile, 'utf8'));
+            const now = Date.now();
+            let changed = false;
+
+            // guild id = 1469071689559281734
+            // role = 1471431323645378766
+            const roleX2 = '1471431323645378766';
+            const guild = client.guilds.cache.first(); // Assuming single guild or cache has it
+            if (!guild) return;
+
+            for (const [userId, data] of Object.entries(xpData)) {
+                if (now > data.expiresAt) {
+                    const member = await guild.members.fetch(userId).catch(() => null);
+                    if (member && member.roles.cache.has(roleX2)) {
+                        await member.roles.remove(roleX2).catch(console.error);
+                    }
+                    delete xpData[userId];
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                fs.writeFileSync(xpBoostsFile, JSON.stringify(xpData, null, 2));
+            }
+        } catch (err) {
+            console.error('Error in xpBoosts cron job:', err);
+        }
     });
 
     // Cron job à 9h00
