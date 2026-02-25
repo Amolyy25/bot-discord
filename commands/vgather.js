@@ -25,19 +25,19 @@ module.exports = {
 
     async execute(interaction) {
         if (!checkPermission(interaction.member, 'vgather') && !isAdmin(interaction.member)) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', flags: 64 });
         }
 
         const targetChannel = interaction.member.voice.channel;
         if (!targetChannel) {
-            return interaction.reply({ content: '❌ Vous devez être dans un salon vocal pour utiliser cette commande.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous devez être dans un salon vocal pour utiliser cette commande.', flags: 64 });
         }
 
         // On utilise directement le cache pour éviter le Rate Limit (les membres en vocal sont toujours cachés par discord.js)
         const membersToMove = interaction.guild.members.cache.filter(m => m.voice.channelId && m.voice.channelId !== targetChannel.id);
         
         if (membersToMove.size === 0) {
-            return interaction.reply({ content: '⚠️ Personne n\'est à rassembler (tous les vocaux sont vides ou tout le monde est déjà ici).', ephemeral: true });
+            return interaction.reply({ content: '⚠️ Personne n\'est à rassembler (tous les vocaux sont vides ou tout le monde est déjà ici).', flags: 64 });
         }
 
         const membersArray = Array.from(membersToMove.values());

@@ -9,11 +9,11 @@ module.exports = {
     async execute(interaction) {
         const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (!checkPermission(interaction.member, 'setuprole')) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', flags: 64 });
         }
 
         await this.sendSetup(interaction.guild, interaction.channel);
-        await interaction.reply({ content: '✅ Système de rôles envoyé !', ephemeral: true });
+        await interaction.reply({ content: '✅ Système de rôles envoyé !', flags: 64 });
     },
 
     async executeMessage(message, args) {

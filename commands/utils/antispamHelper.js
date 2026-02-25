@@ -560,15 +560,43 @@ async function applySanction(message, violationType, details) {
     .send(`${message.author} moin vite, détend toi`)
     .catch(() => {});
 
-  let muteDurationMinutes = 0;
+  // Détermination de la sanction
+  let sanctionType = 'warn';
+  let sanctionLevel = '1';
+  let durationStr = 'instantané';
+  let gravityLabel = `Détection de spam (${userData.spamOccurrence}e fois)`;
+
   if (userData.spamOccurrence === 2) {
-    muteDurationMinutes = 5;
+    sanctionType = 'tempmute';
+    sanctionLevel = '1';
+    durationStr = '5m';
   } else if (userData.spamOccurrence > 2) {
-    muteDurationMinutes = 20;
+    sanctionType = 'tempmute';
+    sanctionLevel = '3';
+    durationStr = '20m';
   }
 
-  if (muteDurationMinutes > 0) {
-    const durationMs = muteDurationMinutes * 60 * 1000;
+  // Toujours enregistrer dans les sanctions.json
+  try {
+    const { addSanction } = require("./sanctionsHelper");
+    addSanction(
+      message.guild.id,
+      message.author.id,
+      sanctionType,
+      sanctionLevel,
+      "[AntiSpam]",
+      null,
+      'Spam',
+      gravityLabel,
+      durationStr
+    );
+  } catch (e) {
+    console.error("[AntiSpam] Erreur ajout sanction:", e);
+  }
+
+  // Application effective du timeout pour les récidives
+  if (sanctionType === 'tempmute') {
+    const durationMs = (durationStr === '5m' ? 5 : 20) * 60 * 1000;
     const member = await message.guild.members.fetch(message.author.id).catch(() => null);
     
     if (member && member.moderatable) {
@@ -584,16 +612,6 @@ async function applySanction(message, violationType, details) {
 
       userData.isMuted = true;
 
-      const level = muteDurationMinutes === 5 ? '1' : '3';
-      const gravityLabel = `Récidive de spam (${userData.spamOccurrence}e fois)`;
-      
-      try {
-        const { addSanction } = require("./sanctionsHelper");
-        addSanction(message.guild.id, message.author.id, 'tempmute', level, "[AntiSpam]", null, 'Spam', gravityLabel);
-      } catch (e) {
-        console.error("[AntiSpam] Erreur ajout sanction:", e);
-      }
-      
       try {
         await message.author.send({
             embeds: [{
@@ -602,7 +620,7 @@ async function applySanction(message, violationType, details) {
                 description: `Vous avez été rendu muet sur **${message.guild.name}**.`,
                 fields: [
                     { name: 'Raison', value: gravityLabel, inline: true },
-                    { name: 'Durée', value: `${muteDurationMinutes} minutes`, inline: true }
+                    { name: 'Durée', value: durationStr === '5m' ? '5 minutes' : '20 minutes', inline: true }
                 ],
                 timestamp: new Date()
             }]

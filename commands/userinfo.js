@@ -14,7 +14,7 @@ module.exports = {
         const adminStatus = isAdmin(interaction.member);
         if (isModChannel(interaction.channelId) && !adminStatus) return;
         if (!checkPermission(interaction.member, 'userinfo')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         const user = interaction.options.getUser('utilisateur') || interaction.user;
         const member = await interaction.guild.members.fetch(user.id).catch(() => null);

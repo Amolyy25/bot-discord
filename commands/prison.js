@@ -22,7 +22,7 @@ module.exports = {
         
         // Vérification de permission : 'prison' ou isBoosterOrPerm2 par défaut
         if (!checkPermission(interaction.member, 'prison', isBoosterOrPerm2)) {
-            return interaction.reply({ content: 'non ta pas la perm (Booster minimum)', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm (Booster minimum)', flags: 64 });
         }
 
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
@@ -31,11 +31,11 @@ module.exports = {
         const duration = interaction.options.getInteger('duree') || 5;
         
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé !', ephemeral: true });
-        if (!member.voice.channel) return interaction.reply({ content: 'L\'utilisateur n\'est pas en vocal !', ephemeral: true });
+        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé !', flags: 64 });
+        if (!member.voice.channel) return interaction.reply({ content: 'L\'utilisateur n\'est pas en vocal !', flags: 64 });
 
         const prisonChannel = interaction.guild.channels.cache.find(c => c.name.toLowerCase().includes('prison') || c.name.toLowerCase().includes('cachot'));
-        if (!prisonChannel) return interaction.reply({ content: 'Aucun salon nommé "Prison" n\'a été trouvé !', ephemeral: true });
+        if (!prisonChannel) return interaction.reply({ content: 'Aucun salon nommé "Prison" n\'a été trouvé !', flags: 64 });
 
         const expiration = Date.now() + (duration * 60 * 1000);
         global.prisonniers.set(member.id, {
@@ -48,7 +48,7 @@ module.exports = {
             await interaction.reply({ content: `⚖️ **${targetUser.tag}** a été condamné à ${duration} minutes de cachot !` });
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'Je n\'ai pas la permission de déplacer ce membre !', ephemeral: true });
+            await interaction.reply({ content: 'Je n\'ai pas la permission de déplacer ce membre !', flags: 64 });
         }
     },
 

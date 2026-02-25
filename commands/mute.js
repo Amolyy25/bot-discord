@@ -18,7 +18,7 @@ module.exports = {
         
         // Vérification de permission
         if (!checkPermission(interaction.member, 'mute')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         
         if (!isModChannel(interaction.channelId) && !adminStatus) return;
@@ -26,10 +26,10 @@ module.exports = {
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
-        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', ephemeral: true });
-        if (!member.moderatable) return interaction.reply({ content: 'Je ne peux pas modérer cet utilisateur!', ephemeral: true });
+        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', flags: 64 });
+        if (!member.moderatable) return interaction.reply({ content: 'Je ne peux pas modérer cet utilisateur!', flags: 64 });
         if (member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({ content: 'Vous ne pouvez pas modérer quelqu\'un avec un rôle égal ou supérieur!', ephemeral: true });
+            return interaction.reply({ content: 'Vous ne pouvez pas modérer quelqu\'un avec un rôle égal ou supérieur!', flags: 64 });
         }
 
         await startInteractiveMutePermanent(interaction, target, member);
@@ -143,6 +143,7 @@ async function startInteractiveMutePermanent(context, target, member) {
             selections.level = i.values[0];
             selections.gravityLabel = data.label;
         } else if (i.customId === 'confirm_mute') {
+            await i.deferUpdate().catch(() => {});
             try {
                 const mutedRole = i.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
                 if (mutedRole) {
@@ -176,15 +177,17 @@ async function startInteractiveMutePermanent(context, target, member) {
                     timestamp: new Date().toISOString()
                 };
 
-                await i.update({ content: null, embeds: [finalEmbed], components: [] });
+                await i.editReply({ content: null, embeds: [finalEmbed], components: [] });
                 collector.stop();
+                return;
             } catch (error) {
                 console.error(error);
-                return i.reply({ content: 'Erreur lors de l\'application de la sanction!', ephemeral: true });
+                return i.followUp({ content: 'Erreur lors de l\'application de la sanction!', flags: 64 });
             }
         } else if (i.customId === 'cancel_mute') {
             await i.update({ content: 'Sanction annulée.', embeds: [], components: [] });
             collector.stop();
+            return;
         }
 
         embed.fields[0].value = selections.category || 'Non sélectionnée';

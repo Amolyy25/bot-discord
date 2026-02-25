@@ -9,7 +9,7 @@ module.exports = {
         const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
         if (!checkPermission(interaction.member, 'stats')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         const { guild } = interaction;
 
@@ -35,7 +35,7 @@ module.exports = {
             await interaction.reply({ embeds: [embed] });
         } catch (error) {
             console.error('Erreur stats:', error);
-            await interaction.reply({ content: 'Une erreur est survenue lors de la récupération des statistiques.', ephemeral: true });
+            await interaction.reply({ content: 'Une erreur est survenue lors de la récupération des statistiques.', flags: 64 });
         }
     },
 

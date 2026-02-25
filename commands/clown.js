@@ -18,7 +18,7 @@ module.exports = {
         const hasPerm = checkPermission(interaction.member, 'clown', (m) => isBoosterOrPerm2(m) || m.roles.cache.has('1469071689399926791'));
 
         if (!hasPerm) {
-            return interaction.reply({ content: 'non ta pas la perm (Booster minimum)', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm (Booster minimum)', flags: 64 });
         }
 
         const target = interaction.options.getUser('utilisateur');

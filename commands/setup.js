@@ -13,7 +13,7 @@ module.exports = {
         // On autorise si c'est un admin ou s'il a la perm ET que ce n'est pas le salon de modé (sauf bypass admin)
         if (isModChannel(interaction.channelId) && !adminStatus) return;
         if (!checkPermission(interaction.member, 'setup')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
 
         const categoryId = '1469071692348264635';

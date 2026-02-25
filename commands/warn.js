@@ -17,7 +17,7 @@ module.exports = {
         
         // Vérification de permission
         if (!checkPermission(interaction.member, 'warn')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         
         if (!isModChannel(interaction.channelId) && !adminStatus) return;
@@ -25,9 +25,9 @@ module.exports = {
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
-        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', ephemeral: true });
+        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', flags: 64 });
         if (member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({ content: 'Vous ne pouvez pas modérer quelqu\'un avec un rôle égal ou supérieur!', ephemeral: true });
+            return interaction.reply({ content: 'Vous ne pouvez pas modérer quelqu\'un avec un rôle égal ou supérieur!', flags: 64 });
         }
 
         await startInteractiveWarn(interaction, target, member);
@@ -139,6 +139,7 @@ async function startInteractiveWarn(context, target, member) {
             selections.level = i.values[0];
             selections.gravityLabel = data.label;
         } else if (i.customId === 'confirm_warn') {
+            await i.deferUpdate().catch(() => {});
             try {
                 try {
                     await target.send({
@@ -179,12 +180,12 @@ async function startInteractiveWarn(context, target, member) {
                     timestamp: new Date().toISOString()
                 };
 
-                await i.update({ content: null, embeds: [finalEmbed], components: [] });
+                await i.editReply({ content: null, embeds: [finalEmbed], components: [] });
                 collector.stop();
                 return;
             } catch (error) {
                 console.error(error);
-                return i.reply({ content: 'Erreur lors de l\'application de la sanction!', ephemeral: true });
+                return i.followUp({ content: 'Erreur lors de l\'application de la sanction!', flags: 64 });
             }
         } else if (i.customId === 'cancel_warn') {
             await i.update({ content: 'Sanction annulée.', embeds: [], components: [] });

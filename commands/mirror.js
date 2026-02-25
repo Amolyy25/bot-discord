@@ -24,7 +24,7 @@ module.exports = {
         
         // Vérification de permission : 'mirror' ou isBoosterOrPerm2 par défaut
         if (!checkPermission(interaction.member, 'mirror', isBoosterOrPerm2)) {
-            return interaction.reply({ content: 'non ta pas la perm (Booster minimum)', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm (Booster minimum)', flags: 64 });
         }
 
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;

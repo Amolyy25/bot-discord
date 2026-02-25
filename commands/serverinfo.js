@@ -9,7 +9,7 @@ module.exports = {
         const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
         if (!checkPermission(interaction.member, 'serverinfo')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         const guild = interaction.guild;
 

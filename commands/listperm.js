@@ -11,7 +11,7 @@ module.exports = {
         const perms = loadPermissions();
 
         if (Object.keys(perms).length === 0) {
-            return interaction.reply({ content: '❌ Aucune permission spéciale n\'a été configurée.', ephemeral: true });
+            return interaction.reply({ content: '❌ Aucune permission spéciale n\'a été configurée.', flags: 64 });
         }
 
         const embed = new EmbedBuilder()
@@ -52,10 +52,10 @@ module.exports = {
         }
 
         if (!hasFields) {
-            return interaction.reply({ content: '❌ Aucune permission active trouvée (fichiers vides ou nettoyés).', ephemeral: true });
+            return interaction.reply({ content: '❌ Aucune permission active trouvée (fichiers vides ou nettoyés).', flags: 64 });
         }
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], flags: 64 });
     },
 
     async executeMessage(message) {

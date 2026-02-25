@@ -19,7 +19,7 @@ module.exports = {
         const hasPerm = checkPermission(currentMember, 'banner', (m) => isBoosterOrPerm2(m) || m.roles.cache.has(allowedRole));
 
         if (!hasPerm) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         
         if (isModChannel(interaction.channelId) && !adminStatus) return;
@@ -32,7 +32,7 @@ module.exports = {
         const bannerUrl = user.bannerURL({ size: 4096, dynamic: true });
 
         if (!bannerUrl) {
-            return interaction.reply({ content: "Cet utilisateur n'a pas de bannière.", ephemeral: true });
+            return interaction.reply({ content: "Cet utilisateur n'a pas de bannière.", flags: 64 });
         }
 
         const member = await interaction.guild.members.fetch(user.id).catch(() => null);

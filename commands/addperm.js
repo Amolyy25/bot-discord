@@ -31,21 +31,21 @@ module.exports = {
         const limit = interaction.options.getInteger('limite');
 
         if (!user && !role) {
-            return interaction.reply({ content: '❌ Vous devez spécifier au moins un utilisateur ou un rôle.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous devez spécifier au moins un utilisateur ou un rôle.', flags: 64 });
         }
 
         if (user) {
             addPermission(commandName, 'user', user.id);
-            await interaction.reply({ content: `✅ Permission **${commandName}** accordée à ${user}.`, ephemeral: true });
+            await interaction.reply({ content: `✅ Permission **${commandName}** accordée à ${user}.`, flags: 64 });
         }
 
         if (role) {
             addPermission(commandName, 'role', role.id, limit);
             const limitMsg = limit ? ` (Expire après ${limit} utilisation(s))` : '';
             if (user) {
-                await interaction.followUp({ content: `✅ Permission **${commandName}** accordée au rôle ${role}${limitMsg}.`, ephemeral: true });
+                await interaction.followUp({ content: `✅ Permission **${commandName}** accordée au rôle ${role}${limitMsg}.`, flags: 64 });
             } else {
-                await interaction.reply({ content: `✅ Permission **${commandName}** accordée au rôle ${role}${limitMsg}.`, ephemeral: true });
+                await interaction.reply({ content: `✅ Permission **${commandName}** accordée au rôle ${role}${limitMsg}.`, flags: 64 });
             }
         }
     },

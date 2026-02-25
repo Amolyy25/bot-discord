@@ -15,7 +15,7 @@ module.exports = {
         
         // Vérification de permission
         if (!checkPermission(interaction.member, 'clear')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         
         if (!isModChannel(interaction.channelId) && !adminStatus) return;
@@ -23,7 +23,7 @@ module.exports = {
         const amount = interaction.options.getInteger('nombre');
 
         if (amount < 1 || amount > 100) {
-            return interaction.reply({ content: 'Le nombre de messages doit être entre 1 et 100!', ephemeral: true });
+            return interaction.reply({ content: 'Le nombre de messages doit être entre 1 et 100!', flags: 64 });
         }
 
         try {
@@ -52,7 +52,7 @@ module.exports = {
             });
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'Erreur lors de la suppression des messages!', ephemeral: true });
+            await interaction.reply({ content: 'Erreur lors de la suppression des messages!', flags: 64 });
         }
     },
 

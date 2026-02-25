@@ -16,7 +16,7 @@ module.exports = {
         
         // Vérification de permission
         if (!checkPermission(interaction.member, 'unsoumis')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
 
         const adminStatus = isAdmin(interaction.member);
@@ -25,11 +25,11 @@ module.exports = {
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
-        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', ephemeral: true });
+        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', flags: 64 });
 
         const role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'soumis');
         if (!role || !member.roles.cache.has(role.id)) {
-            return interaction.reply({ content: 'Cet utilisateur n\'est pas soumis!', ephemeral: true });
+            return interaction.reply({ content: 'Cet utilisateur n\'est pas soumis!', flags: 64 });
         }
 
         try {
@@ -55,7 +55,7 @@ module.exports = {
             await interaction.reply({ content: `${target} a été libéré et a retrouvé ses rôles !` });
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'Erreur lors de l\'annulation de la soumission!', ephemeral: true });
+            await interaction.reply({ content: 'Erreur lors de l\'annulation de la soumission!', flags: 64 });
         }
     },
 

@@ -25,7 +25,7 @@ module.exports = {
         const adminStatus = isAdmin(interaction.member);
         if (!isModChannel(interaction.channelId) && !adminStatus) return;
         if (!checkPermission(interaction.member, 'sanctions')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         const userStr = interaction.options.getString('utilisateur');
         let userId;
@@ -41,7 +41,7 @@ module.exports = {
         const guildId = interaction.guild.id;
 
         if (!sanctions[guildId] || !sanctions[guildId][userId] || sanctions[guildId][userId].length === 0) {
-            return interaction.reply({ content: 'Aucune sanction trouvée pour cet utilisateur!', ephemeral: true });
+            return interaction.reply({ content: 'Aucune sanction trouvée pour cet utilisateur!', flags: 64 });
         }
 
         const userSanctions = sanctions[guildId][userId];

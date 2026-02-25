@@ -24,14 +24,14 @@ module.exports = {
 
     async execute(interaction) {
         if (!checkPermission(interaction.member, 'vunlock') && !isAdmin(interaction.member) && !interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de déverrouiller ce salon.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de déverrouiller ce salon.', flags: 64 });
         }
 
         const channel = interaction.member.voice.channel;
-        if (!channel) return interaction.reply({ content: '❌ Vous n\'êtes pas dans un salon vocal.', ephemeral: true });
+        if (!channel) return interaction.reply({ content: '❌ Vous n\'êtes pas dans un salon vocal.', flags: 64 });
 
         const locks = loadLocks();
-        if (!locks[channel.id]) return interaction.reply({ content: '⚠️ Ce salon vocal n\'est pas verrouillé.', ephemeral: true });
+        if (!locks[channel.id]) return interaction.reply({ content: '⚠️ Ce salon vocal n\'est pas verrouillé.', flags: 64 });
 
         const savedOverwrites = locks[channel.id];
 
@@ -42,7 +42,7 @@ module.exports = {
             await interaction.reply(`🔓 **${channel.name}** a été déverrouillé (vocal).`);
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: '❌ Erreur.', ephemeral: true });
+            await interaction.reply({ content: '❌ Erreur.', flags: 64 });
         }
     },
 

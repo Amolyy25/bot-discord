@@ -26,14 +26,14 @@ module.exports = {
 
     async execute(interaction) {
         if (!checkPermission(interaction.member, 'vclear') && !isAdmin(interaction.member)) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', flags: 64 });
         }
 
         const targetChannel = interaction.options.getChannel('salon');
         const membersToDisconnect = Array.from(targetChannel.members.values());
         
         if (membersToDisconnect.length === 0) {
-            return interaction.reply({ content: '⚠️ Personne n\'est connecté dans ce salon vocal.', ephemeral: true });
+            return interaction.reply({ content: '⚠️ Personne n\'est connecté dans ce salon vocal.', flags: 64 });
         }
 
         await interaction.reply({ embeds: [buildProgressEmbed(0, membersToDisconnect.length)] });

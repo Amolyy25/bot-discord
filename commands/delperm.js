@@ -25,20 +25,20 @@ module.exports = {
         const role = interaction.options.getRole('role');
 
         if (!user && !role) {
-            return interaction.reply({ content: '❌ Vous devez spécifier au moins un utilisateur ou un rôle.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous devez spécifier au moins un utilisateur ou un rôle.', flags: 64 });
         }
 
         if (user) {
             removePermission(commandName, 'user', user.id);
-            await interaction.reply({ content: `🗑️ Permission **${commandName}** retirée à ${user}.`, ephemeral: true });
+            await interaction.reply({ content: `🗑️ Permission **${commandName}** retirée à ${user}.`, flags: 64 });
         }
 
         if (role) {
             removePermission(commandName, 'role', role.id);
             if (user) {
-                await interaction.followUp({ content: `🗑️ Permission **${commandName}** retirée au rôle ${role}.`, ephemeral: true });
+                await interaction.followUp({ content: `🗑️ Permission **${commandName}** retirée au rôle ${role}.`, flags: 64 });
             } else {
-                await interaction.reply({ content: `🗑️ Permission **${commandName}** retirée au rôle ${role}.`, ephemeral: true });
+                await interaction.reply({ content: `🗑️ Permission **${commandName}** retirée au rôle ${role}.`, flags: 64 });
             }
         }
     },

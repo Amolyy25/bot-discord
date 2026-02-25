@@ -17,7 +17,7 @@ module.exports = {
         
         // Vérification de permission
         if (!checkPermission(interaction.member, 'ban')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         
         if (!isModChannel(interaction.channelId) && !adminStatus) return;
@@ -28,9 +28,9 @@ module.exports = {
         // Even if member is null, we might want to ban by ID
         const bannable = member ? member.bannable : true;
         
-        if (!bannable) return interaction.reply({ content: 'Je ne peux pas bannir cet utilisateur!', ephemeral: true });
+        if (!bannable) return interaction.reply({ content: 'Je ne peux pas bannir cet utilisateur!', flags: 64 });
         if (member && member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({ content: 'Vous ne pouvez pas modérer quelqu\'un avec un rôle égal ou supérieur!', ephemeral: true });
+            return interaction.reply({ content: 'Vous ne pouvez pas modérer quelqu\'un avec un rôle égal ou supérieur!', flags: 64 });
         }
 
         await startInteractiveBan(interaction, target, member);
@@ -143,6 +143,7 @@ async function startInteractiveBan(context, target, member) {
             selections.level = i.values[0];
             selections.gravityLabel = data.label;
         } else if (i.customId === 'confirm_ban') {
+            await i.deferUpdate().catch(() => {});
             try {
                 await i.guild.bans.create(target.id, { reason: `Ban par ${user.tag} - ${selections.gravityLabel}` });
                 addSanction(i.guild.id, target.id, 'ban', selections.level, user.tag, null, selections.category, selections.gravityLabel, 'permanent');
@@ -168,15 +169,17 @@ async function startInteractiveBan(context, target, member) {
                     timestamp: new Date().toISOString()
                 };
 
-                await i.update({ content: null, embeds: [finalEmbed], components: [] });
+                await i.editReply({ content: null, embeds: [finalEmbed], components: [] });
                 collector.stop();
+                return;
             } catch (error) {
                 console.error(error);
-                return i.reply({ content: 'Erreur lors de l\'application de la sanction!', ephemeral: true });
+                return i.followUp({ content: 'Erreur lors de l\'application de la sanction!', flags: 64 });
             }
         } else if (i.customId === 'cancel_ban') {
             await i.update({ content: 'Sanction annulée.', embeds: [], components: [] });
             collector.stop();
+            return;
         }
 
         embed.fields[0].value = selections.category || 'Non sélectionnée';

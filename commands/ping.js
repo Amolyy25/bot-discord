@@ -9,7 +9,7 @@ module.exports = {
         const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
         if (isModChannel(interaction.channelId) && !isAdmin(interaction.member)) return;
         if (!checkPermission(interaction.member, 'ping')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         const sent = await interaction.reply({ content: '🏓 Pong!', fetchReply: true });
         const latency = sent.createdTimestamp - interaction.createdTimestamp;

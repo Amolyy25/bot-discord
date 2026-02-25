@@ -37,18 +37,18 @@ module.exports = {
 
     async execute(interaction) {
         if (!interaction.guild) {
-            return interaction.reply({ content: '❌ Cette commande ne peut être utilisée que sur un serveur.', ephemeral: true });
+            return interaction.reply({ content: '❌ Cette commande ne peut être utilisée que sur un serveur.', flags: 64 });
         }
 
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) && !checkPermission(interaction.member, 'lock')) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de verrouiller ce salon.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de verrouiller ce salon.', flags: 64 });
         }
 
         const channel = interaction.channel;
         const locks = loadLocks();
 
         if (locks[channel.id]) {
-            return interaction.reply({ content: '⚠️ Ce salon est déjà verrouillé.', ephemeral: true });
+            return interaction.reply({ content: '⚠️ Ce salon est déjà verrouillé.', flags: 64 });
         }
 
         // Sauvegarder les permissions actuelles
@@ -74,7 +74,7 @@ module.exports = {
             // En cas d'erreur, on annule la sauvegarde
             delete locks[channel.id];
             saveLocks(locks);
-            await interaction.reply({ content: '❌ Erreur lors du verrouillage du salon.', ephemeral: true });
+            await interaction.reply({ content: '❌ Erreur lors du verrouillage du salon.', flags: 64 });
         }
     },
 

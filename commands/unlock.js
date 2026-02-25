@@ -34,18 +34,18 @@ module.exports = {
 
     async execute(interaction) {
         if (!interaction.guild) {
-            return interaction.reply({ content: '❌ Cette commande ne peut être utilisée que sur un serveur.', ephemeral: true });
+            return interaction.reply({ content: '❌ Cette commande ne peut être utilisée que sur un serveur.', flags: 64 });
         }
 
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) && !checkPermission(interaction.member, 'unlock')) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de déverrouiller ce salon.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de déverrouiller ce salon.', flags: 64 });
         }
 
         const channel = interaction.channel;
         const locks = loadLocks();
 
         if (!locks[channel.id]) {
-            return interaction.reply({ content: '⚠️ Ce salon n\'est pas verrouillé (ou aucune sauvegarde trouvée).', ephemeral: true });
+            return interaction.reply({ content: '⚠️ Ce salon n\'est pas verrouillé (ou aucune sauvegarde trouvée).', flags: 64 });
         }
 
         const savedOverwrites = locks[channel.id];
@@ -62,7 +62,7 @@ module.exports = {
             await interaction.reply('🔓 **Salon déverrouillé.** Les permissions ont été restaurées.');
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: '❌ Erreur lors du déverrouillage du salon.', ephemeral: true });
+            await interaction.reply({ content: '❌ Erreur lors du déverrouillage du salon.', flags: 64 });
         }
     },
 

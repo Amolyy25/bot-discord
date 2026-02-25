@@ -26,7 +26,7 @@ module.exports = {
         const hasPerm = checkPermission(currentMember, 'fake', (m) => isBoosterOrPerm2(m) || m.roles.cache.has(allowedRole));
 
         if (!hasPerm) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         const target = interaction.options.getUser('utilisateur');
         await this.handleFakeCheck(interaction, target);

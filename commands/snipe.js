@@ -14,12 +14,12 @@ module.exports = {
         const adminStatus = isAdmin(interaction.member);
         if (isModChannel(interaction.channelId) && !adminStatus) return;
         if (!checkPermission(interaction.member, 'snipe')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
 
         const channelSnipes = snipes.get(interaction.channelId);
         if (!channelSnipes || channelSnipes.length === 0) {
-            return interaction.reply({ content: 'Aucun message supprimé récent à sniper!', ephemeral: true });
+            return interaction.reply({ content: 'Aucun message supprimé récent à sniper!', flags: 64 });
         }
 
         const targetUser = interaction.options.getUser('utilisateur');
@@ -35,7 +35,7 @@ module.exports = {
             const errorMsg = targetUser 
                 ? `Aucun message supprimé récent trouvé pour **${targetUser.tag}**.` 
                 : 'Aucun message supprimé récent à sniper!';
-            return interaction.reply({ content: errorMsg, ephemeral: true });
+            return interaction.reply({ content: errorMsg, flags: 64 });
         }
 
         const timeDiff = Math.floor((Date.now() - snipe.timestamp) / 1000);

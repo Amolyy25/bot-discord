@@ -18,7 +18,7 @@ module.exports = {
         const targetChannelId = targetChannel ? targetChannel.id : null;
         const channelName = targetChannel ? targetChannel.name : "Salon par défaut (Général)";
 
-        await interaction.reply({ content: `✅ Lancement forcé du Jackpot Chrono dans **${channelName}**...`, ephemeral: true });
+        await interaction.reply({ content: `✅ Lancement forcé du Jackpot Chrono dans **${channelName}**...`, flags: 64 });
         
         // Lancer le jackpot avec l'ID du salon (ou null pour défaut)
         await jackpot.launchJackpot(client, targetChannelId);

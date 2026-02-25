@@ -35,17 +35,17 @@ module.exports = {
 
     async execute(interaction) {
         if (!checkPermission(interaction.member, 'vmoveall') && !isAdmin(interaction.member)) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', flags: 64 });
         }
 
         const sourceChannel = interaction.member.voice.channel;
         if (!sourceChannel) {
-            return interaction.reply({ content: '❌ Vous devez être dans un salon vocal pour utiliser cette commande.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous devez être dans un salon vocal pour utiliser cette commande.', flags: 64 });
         }
 
         const membersToMove = Array.from(sourceChannel.members.values());
         if (membersToMove.length === 0) {
-            return interaction.reply({ content: '⚠️ Personne n\'est connecté dans votre salon vocal!', ephemeral: true });
+            return interaction.reply({ content: '⚠️ Personne n\'est connecté dans votre salon vocal!', flags: 64 });
         }
 
         const targetChannels = [];
@@ -57,7 +57,7 @@ module.exports = {
         }
 
         if (targetChannels.length === 0) {
-            return interaction.reply({ content: '❌ Vous devez spécifier au moins un salon vocal cible valide (différent de votre salon actuel).', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous devez spécifier au moins un salon vocal cible valide (différent de votre salon actuel).', flags: 64 });
         }
 
         await interaction.reply({ embeds: [buildProgressEmbed(0, membersToMove.length)] });

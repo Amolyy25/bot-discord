@@ -20,7 +20,7 @@ module.exports = {
         
         // Vérification de permission
         if (!checkPermission(interaction.member, 'unmute')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         
         if (!isModChannel(interaction.channelId) && !adminStatus) return;
@@ -30,7 +30,7 @@ module.exports = {
         const member = await interaction.guild.members.fetch(target.id);
 
         if (!member.moderatable) {
-            return interaction.reply({ content: 'Je ne peux pas modérer cet utilisateur!', ephemeral: true });
+            return interaction.reply({ content: 'Je ne peux pas modérer cet utilisateur!', flags: 64 });
         }
 
         try {
@@ -67,7 +67,7 @@ module.exports = {
             await interaction.reply({ content: `${target.tag} a été démuté avec succès!`, embeds: [embed] });
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'Erreur lors du unmute de l\'utilisateur!', ephemeral: true });
+            await interaction.reply({ content: 'Erreur lors du unmute de l\'utilisateur!', flags: 64 });
         }
     },
 

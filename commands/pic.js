@@ -19,7 +19,7 @@ module.exports = {
         const hasPerm = checkPermission(currentMember, 'pic', (m) => isBoosterOrPerm2(m) || m.roles.cache.has(allowedRole));
 
         if (!hasPerm) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
         
         if (isModChannel(interaction.channelId) && !adminStatus) return;

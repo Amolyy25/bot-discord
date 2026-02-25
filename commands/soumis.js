@@ -16,7 +16,7 @@ module.exports = {
         
         // Vérification de permission
         if (!checkPermission(interaction.member, 'soumis')) {
-            return interaction.reply({ content: 'non ta pas la perm', ephemeral: true });
+            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
         }
 
         const adminStatus = isAdmin(interaction.member);
@@ -25,9 +25,9 @@ module.exports = {
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
-        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', ephemeral: true });
+        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', flags: 64 });
         if (member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({ content: 'Vous ne pouvez pas soumettre quelqu\'un avec un rôle égal ou supérieur!', ephemeral: true });
+            return interaction.reply({ content: 'Vous ne pouvez pas soumettre quelqu\'un avec un rôle égal ou supérieur!', flags: 64 });
         }
 
         let role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'soumis');
@@ -40,7 +40,7 @@ module.exports = {
                     reason: 'Rôle pour la commande soumis'
                 });
             } catch (error) {
-                return interaction.reply({ content: 'Je ne peux pas créer le rôle "soumis"!', ephemeral: true });
+                return interaction.reply({ content: 'Je ne peux pas créer le rôle "soumis"!', flags: 64 });
             }
         }
 
@@ -69,7 +69,7 @@ module.exports = {
             await interaction.reply({ content: `${target} a été soumis par **${interaction.user.tag}** !` });
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'Erreur lors de la soumission!', ephemeral: true });
+            await interaction.reply({ content: 'Erreur lors de la soumission!', flags: 64 });
         }
     },
 

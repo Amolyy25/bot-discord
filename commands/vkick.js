@@ -10,18 +10,18 @@ module.exports = {
 
     async execute(interaction) {
         if (!checkPermission(interaction.member, 'vkick') && !isAdmin(interaction.member)) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', ephemeral: true });
+            return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', flags: 64 });
         }
 
         const targetUser = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
         if (!member) {
-            return interaction.reply({ content: 'Utilisateur introuvable.', ephemeral: true });
+            return interaction.reply({ content: 'Utilisateur introuvable.', flags: 64 });
         }
 
         if (!member.voice.channelId) {
-            return interaction.reply({ content: `⚠️ ${targetUser.tag} n'est connecté à aucun salon vocal.`, ephemeral: true });
+            return interaction.reply({ content: `⚠️ ${targetUser.tag} n'est connecté à aucun salon vocal.`, flags: 64 });
         }
 
         try {
@@ -37,7 +37,7 @@ module.exports = {
             }).catch(() => {});
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'Erreur lors de la déconnexion vocale.', ephemeral: true });
+            await interaction.reply({ content: 'Erreur lors de la déconnexion vocale.', flags: 64 });
         }
     },
 

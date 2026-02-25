@@ -14,7 +14,7 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        return interaction.reply({ content: 'Cette commande est optimisée pour être utilisée avec le préfixe -signaler', ephemeral: true });
+        return interaction.reply({ content: 'Cette commande est optimisée pour être utilisée avec le préfixe -signaler', flags: 64 });
     },
 
     async executeMessage(message, args, client) {
