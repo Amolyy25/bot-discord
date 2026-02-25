@@ -560,6 +560,57 @@ async function applySanction(message, violationType, details) {
     .send(`${message.author} moin vite, détend toi`)
     .catch(() => {});
 
+  let muteDurationMinutes = 0;
+  if (userData.spamOccurrence === 2) {
+    muteDurationMinutes = 5;
+  } else if (userData.spamOccurrence > 2) {
+    muteDurationMinutes = 20;
+  }
+
+  if (muteDurationMinutes > 0) {
+    const durationMs = muteDurationMinutes * 60 * 1000;
+    const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+    
+    if (member && member.moderatable) {
+      await member.timeout(durationMs, `Anti-Spam - Récidive (${userData.spamOccurrence}e fois)`).catch(() => {});
+      
+      const mutedRole = message.guild.roles.cache.find(r => r.name.toLowerCase() === 'muet' || r.name.toLowerCase() === 'muted');
+      if (mutedRole && member.manageable) {
+          await member.roles.add(mutedRole).catch(() => {});
+          setTimeout(() => {
+              member.roles.remove(mutedRole).catch(() => {});
+          }, durationMs);
+      }
+
+      userData.isMuted = true;
+
+      const level = muteDurationMinutes === 5 ? '1' : '3';
+      const gravityLabel = `Récidive de spam (${userData.spamOccurrence}e fois)`;
+      
+      try {
+        const { addSanction } = require("./sanctionsHelper");
+        addSanction(message.guild.id, message.author.id, 'tempmute', level, "[AntiSpam]", null, 'Spam', gravityLabel);
+      } catch (e) {
+        console.error("[AntiSpam] Erreur ajout sanction:", e);
+      }
+      
+      try {
+        await message.author.send({
+            embeds: [{
+                color: 0xFFA500,
+                title: 'Sanction : Mute Temporaire',
+                description: `Vous avez été rendu muet sur **${message.guild.name}**.`,
+                fields: [
+                    { name: 'Raison', value: gravityLabel, inline: true },
+                    { name: 'Durée', value: `${muteDurationMinutes} minutes`, inline: true }
+                ],
+                timestamp: new Date()
+            }]
+        });
+      } catch (err) {}
+    }
+  }
+
   // Traiter comme un message de spam continu (suppression + buffer + timer)
   await handleOngoingSpam(message, userData);
 
