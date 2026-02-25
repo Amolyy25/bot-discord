@@ -21,15 +21,15 @@ module.exports = {
             const boostLevel = guild.premiumTier;
 
             const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle(`📊 Stats - ${guild.name}`)
-                .setThumbnail(guild.iconURL({ dynamic: true }))
+                .setTitle(`<:love:1470917973819658304> Statistiques - ${guild.name}`)
+                .setDescription(`*Voici les statistiques du serveur du ${new Date().toLocaleDateString('fr-FR')}*`)
                 .addFields(
-                    { name: '👥 Membres', value: `${totalMembers}`, inline: true },
-                    { name: '🟢 En ligne', value: `${onlineMembers}`, inline: true },
-                    { name: '🚀 Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
+                    { name: 'Membres', value: `\`${totalMembers}\` membres au total`, inline: true },
+                    { name: 'En ligne', value: `\`${onlineMembers}\` membres actifs`, inline: true },
+                    { name: 'Boosts', value: `\`${boostCount}\` boosts (Niveau ${boostLevel})`, inline: true }
                 )
-                .setFooter({ text: 'Bot Discord - Statistiques' })
+                .setColor(0xFFFFFF)
+                .setFooter({ text: 'LE SECTEUR STATISTIQUES' })
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
@@ -53,18 +53,17 @@ module.exports = {
             const boostCount = guild.premiumSubscriptionCount || 0;
             const boostLevel = guild.premiumTier;
 
-            const embed = {
-                color: 0x5865F2,
-                title: `📊 Stats - ${guild.name}`,
-                thumbnail: { url: guild.iconURL({ dynamic: true }) },
-                fields: [
-                    { name: '👥 Membres', value: `${totalMembers}`, inline: true },
-                    { name: '🟢 En ligne', value: `${onlineMembers}`, inline: true },
-                    { name: '🚀 Boosts', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
-                ],
-                footer: { text: 'Bot Discord - Statistiques' },
-                timestamp: new Date().toISOString()
-            };
+            const embed = new EmbedBuilder()
+                .setTitle(`<:love:1470917973819658304> Statistiques - ${guild.name}`)
+                .setDescription(`*Voici les statistiques du serveur du ${new Date().toLocaleDateString('fr-FR')}*`)
+                .addFields(
+                    { name: 'Membres', value: `\`${totalMembers}\` membres au total`, inline: true },
+                    { name: 'En ligne', value: `\`${onlineMembers}\` membres actifs`, inline: true },
+                    { name: 'Boosts', value: `\`${boostCount}\` boosts (Niveau ${boostLevel})`, inline: true }
+                )
+                .setColor(0xFFFFFF)
+                .setFooter({ text: 'LE SECTEUR STATISTIQUES' })
+                .setTimestamp();
 
             await message.reply({ embeds: [embed] });
         } catch (error) {

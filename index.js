@@ -36,7 +36,8 @@ const client = new Client({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildModeration,
         GatewayIntentBits.GuildInvites,
-        GatewayIntentBits.GuildMessageReactions // Ajout de l'intent pour les réactions
+        GatewayIntentBits.GuildMessageReactions, // Ajout de l'intent pour les réactions
+        GatewayIntentBits.GuildPresences // Requis pour le comptage des membres en ligne
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction] // Ajout des partiels pour gérer les messages non cachés
 });
@@ -446,18 +447,18 @@ client.once(Events.ClientReady, () => {
             const boostCount = guild.premiumSubscriptionCount || 0;
             const boostLevel = guild.premiumTier;
 
-            const embed = {
-                color: 0xFFFFFFF,
-                title: `Rapport Quotidien - ${guild.name}`,
-                thumbnail: { url: guild.iconURL({ dynamic: true }) },
-                fields: [
-                    { name: 'Membres', value: `${totalMembers}`, inline: true },
-                    { name: 'Actuellement en ligne', value: `${onlineMembers}`, inline: true },
-                    { name: 'Niveau de Boost', value: `${boostCount} (Niveau ${boostLevel})`, inline: true }
-                ],
-                footer: { text: 'LE SECTEUR STATISTIQUES' },
-                timestamp: new Date().toISOString()
-            };
+            const { EmbedBuilder } = require('discord.js');
+            const embed = new EmbedBuilder()
+                .setTitle(`<:love:1470917973819658304> Rapport Quotidien - ${guild.name}`)
+                .setDescription(`*Voici les statistiques du serveur du ${new Date().toLocaleDateString('fr-FR')}*`)
+                .addFields(
+                    { name: 'Membres', value: `\`${totalMembers}\` membres au total`, inline: true },
+                    { name: 'En ligne', value: `\`${onlineMembers}\` membres actifs`, inline: true },
+                    { name: 'Boosts', value: `\`${boostCount}\` boosts (Niveau ${boostLevel})`, inline: true }
+                )
+                .setColor(0xFFFFFF)
+                .setFooter({ text: 'LE SECTEUR STATISTIQUES' })
+                .setTimestamp();
 
             await channel.send({ embeds: [embed] });
             console.log('Stats envoyées avec succès à 9h00');
