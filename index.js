@@ -89,6 +89,22 @@ client.on(Events.GuildMemberAdd, async (member) => {
             .setColor(0xFFFFFF);
 
         await channel.send({ content: `<@${member.id}> <@&1476171525471076536>`, embeds: [embed] });
+
+        // Enregistrer le nouveau membre pour sa récompense de premier message
+        const pendingRewardsFile = path.join(__dirname, 'pendingRewards.json');
+        let pendingRewards = [];
+        if (fs.existsSync(pendingRewardsFile)) {
+            try {
+                pendingRewards = JSON.parse(fs.readFileSync(pendingRewardsFile, 'utf8'));
+            } catch (err) {
+                console.error('Error reading pendingRewards.json:', err);
+            }
+        }
+        if (!pendingRewards.includes(member.id)) {
+            pendingRewards.push(member.id);
+            fs.writeFileSync(pendingRewardsFile, JSON.stringify(pendingRewards, null, 2));
+        }
+
     } catch (error) {
         console.error('Erreur lors de l\'envoi du message de bienvenue:', error);
     }
@@ -350,33 +366,52 @@ client.on('messageCreate', async message => {
     // Gestion du premier message dans le salon général
     const welcomeChannelId = '1469071691941412962';
     if (message.channelId === welcomeChannelId) {
-        const xpBoostRole = '1471887140882092104'; // Role XP x2 - Wait I need to check the exact ID from user promptly.. wait user gave: x2 xp <@&1471431323645378766> and the other <@&1476171525471076536>
-        const roleX2 = '1471431323645378766';
-        const roleOther = '1476171525471076536';
-        
-        const xpBoostsFile = path.join(__dirname, 'xpBoosts.json');
-        let xpData = {};
-        if (fs.existsSync(xpBoostsFile)) {
+        const pendingRewardsFile = path.join(__dirname, 'pendingRewards.json');
+        let pendingRewards = [];
+        let isEligible = false;
+
+        if (fs.existsSync(pendingRewardsFile)) {
             try {
-                xpData = JSON.parse(fs.readFileSync(xpBoostsFile, 'utf8'));
+                pendingRewards = JSON.parse(fs.readFileSync(pendingRewardsFile, 'utf8'));
+                if (pendingRewards.includes(message.author.id)) {
+                    isEligible = true;
+                    // Retirer de la liste d'attente
+                    pendingRewards = pendingRewards.filter(id => id !== message.author.id);
+                    fs.writeFileSync(pendingRewardsFile, JSON.stringify(pendingRewards, null, 2));
+                }
             } catch (err) {
-                console.error('Error reading xpBoosts.json:', err);
+                console.error('Error handling pendingRewards.json:', err);
             }
         }
-        
-        if (!xpData[message.author.id]) {
-            // C'est le premier message enregistré dans général
-            xpData[message.author.id] = {
-                expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 1 week
-            };
-            fs.writeFileSync(xpBoostsFile, JSON.stringify(xpData, null, 2));
 
-            const member = message.member;
-            if (member) {
+        if (isEligible) {
+            const roleX2 = '1470931333760155854'; // Role XP x2
+            const roleOther = '1471431323645378766'; // Autre rôle mentionné dans le message
+            
+            const xpBoostsFile = path.join(__dirname, 'xpBoosts.json');
+            let xpData = {};
+            if (fs.existsSync(xpBoostsFile)) {
                 try {
-                    await member.roles.add([roleX2, roleOther]);
+                    xpData = JSON.parse(fs.readFileSync(xpBoostsFile, 'utf8'));
                 } catch (err) {
-                    console.error('Error adding first message roles:', err);
+                    console.error('Error reading xpBoosts.json:', err);
+                }
+            }
+            
+            if (!xpData[message.author.id]) {
+                // Enregistrer l'expiration
+                xpData[message.author.id] = {
+                    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 // 1 week
+                };
+                fs.writeFileSync(xpBoostsFile, JSON.stringify(xpData, null, 2));
+
+                const member = message.member;
+                if (member) {
+                    try {
+                        await member.roles.add([roleX2, roleOther]);
+                    } catch (err) {
+                        console.error('Error adding first message roles:', err);
+                    }
                 }
             }
         }
@@ -474,8 +509,8 @@ client.once(Events.ClientReady, () => {
             let changed = false;
 
             // guild id = 1469071689559281734
-            // role = 1471431323645378766
-            const roleX2 = '1471431323645378766';
+            // role = 1470931333760155854
+            const roleX2 = '1470931333760155854';
             const guild = client.guilds.cache.first(); // Assuming single guild or cache has it
             if (!guild) return;
 
