@@ -154,7 +154,7 @@ async function startInteractiveMutePermanent(context, target, member) {
                 
                 await member.timeout(28 * 24 * 60 * 60 * 1000, `Mute Permanent: ${selections.gravityLabel}`);
 
-                addSanction(i.guild.id, target.id, 'mute', selections.level, user.tag, null, selections.category, selections.gravityLabel, 'permanent');
+                await addSanction(i.guild.id, target.id, 'mute', selections.level, user.tag, null, selections.category, selections.gravityLabel, 'permanent');
 
                 const { logModAction } = require('./utils/logHelper');
                 await logModAction(i.guild, {

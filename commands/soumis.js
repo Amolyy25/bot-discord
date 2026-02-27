@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { saveUserRoles } = require('./utils/soumisHelper');
+const { addSanction } = require('./utils/sanctionsHelper');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -58,6 +59,9 @@ module.exports = {
             // Ajouter le rôle soumis
             await member.roles.add(role);
             
+            // Enregistrer la sanction
+            await addSanction(interaction.guild.id, target.id, 'soumis', '1', interaction.user.tag, 'Utilisation de la commande soumis', 'Soumis', 'Soumission');
+
             const { logModAction } = require('./utils/logHelper');
             await logModAction(interaction.guild, {
                 action: 'SOUMIS',
@@ -118,6 +122,9 @@ module.exports = {
             }
 
             await member.roles.add(role);
+
+            // Enregistrer la sanction
+            await addSanction(message.guild.id, target.id, 'soumis', '1', message.author.tag, 'Utilisation de la commande soumis', 'Soumis', 'Soumission');
 
             const { logModAction } = require('./utils/logHelper');
             await logModAction(message.guild, {

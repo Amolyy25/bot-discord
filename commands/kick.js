@@ -144,7 +144,7 @@ async function startInteractiveKick(context, target, member) {
             await i.deferUpdate().catch(() => {});
             try {
                 await member.kick(`Kick par ${user.tag} - ${selections.gravityLabel}`);
-                addSanction(i.guild.id, target.id, 'kick', selections.level, user.tag, null, selections.category, selections.gravityLabel, 'instantané');
+                await addSanction(i.guild.id, target.id, 'kick', selections.level, user.tag, null, selections.category, selections.gravityLabel, 'instantané');
 
                 const { logModAction } = require('./utils/logHelper');
                 await logModAction(i.guild, {

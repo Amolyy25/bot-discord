@@ -7,6 +7,8 @@ const cron = require('node-cron');
 const statsCommand = require('./commands/stats.js');
 const antispam = require('./commands/utils/antispamHelper');
 const jackpot = require('./commands/utils/jackpotHelper');
+const { initDB } = require('./commands/utils/db');
+const { migrateSanctions } = require('./commands/utils/sanctionsHelper');
 
 // Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
 const PORT = process.env.PORT || 8080;
@@ -191,7 +193,7 @@ client.on('interactionCreate', async interaction => {
                 }
 
                 await targetMember.timeout(durationMs, `Signalement - Action rapide par ${interaction.user.tag}`);
-                addSanction(interaction.guild.id, targetId, 'tempmute', '2', interaction.user.tag, 'Via Signalement', 'Autre', `Tempmute ${durationLabel}`, durationType);
+                await addSanction(interaction.guild.id, targetId, 'tempmute', '2', interaction.user.tag, 'Via Signalement', 'Autre', `Tempmute ${durationLabel}`, durationType);
                 
                 await logModAction(interaction.guild, {
                     action: 'TEMPMUTE',
@@ -206,7 +208,7 @@ client.on('interactionCreate', async interaction => {
 
             } else if (action === 'ban') {
                 await interaction.guild.bans.create(targetId, { reason: `Signalement - Action rapide par ${interaction.user.tag}` });
-                addSanction(interaction.guild.id, targetId, 'ban', '3', interaction.user.tag, 'Via Signalement', 'Autre', 'Bannissement', 'permanent');
+                await addSanction(interaction.guild.id, targetId, 'ban', '3', interaction.user.tag, 'Via Signalement', 'Autre', 'Bannissement', 'permanent');
                 
                 const targetUserObj = await client.users.fetch(targetId).catch(() => ({ tag: 'Inconnu', id: targetId }));
                 await logModAction(interaction.guild, {
@@ -227,7 +229,7 @@ client.on('interactionCreate', async interaction => {
                  setMutedState(targetId);
                  await targetMember.timeout(28 * 24 * 60 * 60 * 1000, `Signalement - Mute Def par ${interaction.user.tag}`);
 
-                 addSanction(interaction.guild.id, targetId, 'mute', '3', interaction.user.tag, 'Via Signalement', 'Autre', 'Mute Définitif', 'permanent');
+                 await addSanction(interaction.guild.id, targetId, 'mute', '3', interaction.user.tag, 'Via Signalement', 'Autre', 'Mute Définitif', 'permanent');
 
                  await logModAction(interaction.guild, {
                     action: 'MUTE PERMANENT',
@@ -262,7 +264,7 @@ client.on('interactionCreate', async interaction => {
                 const abuseDuration = 20 * 60 * 1000; // 20 minutes
                 await reporterMember.timeout(abuseDuration, `Abus de la commande -signaler - Action par ${interaction.user.tag}`);
                 
-                addSanction(interaction.guild.id, reporterId, 'tempmute', '1', interaction.user.tag, 'Abus Signalement', 'Autre', 'Mute 20m pour abus de signalement', '20m');
+                await addSanction(interaction.guild.id, reporterId, 'tempmute', '1', interaction.user.tag, 'Abus Signalement', 'Autre', 'Mute 20m pour abus de signalement', '20m');
 
                 await logModAction(interaction.guild, {
                     action: 'ABUS SIGNALEMENT',
@@ -638,6 +640,11 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 // Utilisez Events.ClientReady (v14+) pour éviter le warning
 client.once(Events.ClientReady, () => {
     console.log(`Connecté en tant que ${client.user.tag}`);
+
+    // Initialiser la DB et migrer si besoin
+    initDB().then(() => {
+        migrateSanctions();
+    });
 
     // Initialiser l'anti-spam
     antispam.init(client);

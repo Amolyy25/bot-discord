@@ -579,7 +579,7 @@ async function applySanction(message, violationType, details) {
   // Toujours enregistrer dans les sanctions.json
   try {
     const { addSanction } = require("./sanctionsHelper");
-    addSanction(
+    await addSanction(
       message.guild.id,
       message.author.id,
       sanctionType,

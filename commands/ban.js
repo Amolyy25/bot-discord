@@ -146,7 +146,7 @@ async function startInteractiveBan(context, target, member) {
             await i.deferUpdate().catch(() => {});
             try {
                 await i.guild.bans.create(target.id, { reason: `Ban par ${user.tag} - ${selections.gravityLabel}` });
-                addSanction(i.guild.id, target.id, 'ban', selections.level, user.tag, null, selections.category, selections.gravityLabel, 'permanent');
+                await addSanction(i.guild.id, target.id, 'ban', selections.level, user.tag, null, selections.category, selections.gravityLabel, 'permanent');
 
                 const { logModAction } = require('./utils/logHelper');
                 await logModAction(i.guild, {

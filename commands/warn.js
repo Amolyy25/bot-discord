@@ -157,7 +157,7 @@ async function startInteractiveWarn(context, target, member) {
                     console.log(`Impossible d'envoyer un MP à ${target.tag}`);
                 }
 
-                addSanction(i.guild.id, target.id, 'warn', selections.level, user.tag, null, selections.category, selections.gravityLabel);
+                await addSanction(i.guild.id, target.id, 'warn', selections.level, user.tag, null, selections.category, selections.gravityLabel);
 
                 const { logModAction } = require('./utils/logHelper');
                 await logModAction(i.guild, {

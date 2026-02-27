@@ -1,15 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const sanctionsPath = path.join(__dirname, '../sanctions.json');
-
-function loadSanctions() {
-    if (fs.existsSync(sanctionsPath)) {
-        return JSON.parse(fs.readFileSync(sanctionsPath, 'utf8'));
-    }
-    return {};
-}
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { loadSanctionsDB } = require('./utils/sanctionsHelper');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -37,22 +27,14 @@ module.exports = {
             userId = interaction.user.id;
         }
 
-        const sanctions = loadSanctions();
         const guildId = interaction.guild.id;
+        const userSanctions = await loadSanctionsDB(guildId, userId);
 
-        if (!sanctions[guildId] || !sanctions[guildId][userId] || sanctions[guildId][userId].length === 0) {
+        if (!userSanctions || userSanctions.length === 0) {
             return interaction.reply({ content: 'Aucune sanction trouvée pour cet utilisateur!', flags: 64 });
         }
 
-        const userSanctions = sanctions[guildId][userId];
-
         const member = await interaction.guild.members.fetch(userId).catch(() => null);
-
-        const gravityColors = {
-            'Faible': 0x00FF00,
-            'Moyenne': 0xFFA500,
-            'Élevée': 0xFF0000
-        };
 
         const sanctionList = userSanctions.map((sanction, index) => {
             let durationText = sanction.duration ? `\nDurée: ${sanction.duration}` : '';
@@ -71,17 +53,17 @@ module.exports = {
             }
             return `**${index + 1}. ${sanction.type.toUpperCase()}**\nCatégorie: ${sanction.category || 'N/A'}\nGravité: ${sanction.gravity || 'N/A'}${durationText}${expiryText}\nPar: ${sanction.moderator}\nRaison: ${sanction.reason}\nDate: <t:${Math.floor(new Date(sanction.timestamp).getTime() / 1000)}:F>`;
         }).join('\n\n─────────────\n\n');
+        
         const userTag = member?.user?.tag || userId;
 
-        const embed = {
-            color: 0x5865F2,
-            title: `Sanctions de ${userTag}`,
-            description: sanctionList,
-            fields: [
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle(`Sanctions de ${userTag}`)
+            .setDescription(sanctionList.length > 2000 ? sanctionList.substring(0, 1997) + '...' : sanctionList)
+            .addFields(
                 { name: 'Total des sanctions', value: `${userSanctions.length}`, inline: true }
-            ],
-            timestamp: new Date().toISOString()
-        };
+            )
+            .setTimestamp();
 
         await interaction.reply({ embeds: [embed] });
     },
@@ -101,14 +83,12 @@ module.exports = {
             userId = message.author.id;
         }
 
-        const sanctions = loadSanctions();
         const guildId = message.guild.id;
+        const userSanctions = await loadSanctionsDB(guildId, userId);
 
-        if (!sanctions[guildId] || !sanctions[guildId][userId] || sanctions[guildId][userId].length === 0) {
+        if (!userSanctions || userSanctions.length === 0) {
             return message.reply('Aucune sanction trouvée pour cet utilisateur!');
         }
-
-        const userSanctions = sanctions[guildId][userId];
 
         const member = await message.guild.members.fetch(userId).catch(() => null);
 
@@ -129,17 +109,17 @@ module.exports = {
             }
             return `**${index + 1}. ${sanction.type.toUpperCase()}**\nCatégorie: ${sanction.category || 'N/A'}\nGravité: ${sanction.gravity || 'N/A'}${durationText}${expiryText}\nPar: ${sanction.moderator}\nRaison: ${sanction.reason}\nDate: <t:${Math.floor(new Date(sanction.timestamp).getTime() / 1000)}:F>`;
         }).join('\n\n─────────────\n\n');
+
         const userTag = member?.user?.tag || userId;
 
-        const embed = {
-            color: 0x5865F2,
-            title: `Sanctions de ${userTag}`,
-            description: sanctionList,
-            fields: [
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle(`Sanctions de ${userTag}`)
+            .setDescription(sanctionList.length > 2000 ? sanctionList.substring(0, 1997) + '...' : sanctionList)
+            .addFields(
                 { name: 'Total des sanctions', value: `${userSanctions.length}`, inline: true }
-            ],
-            timestamp: new Date().toISOString()
-        };
+            )
+            .setTimestamp();
 
         message.channel.send({ embeds: [embed] });
     }

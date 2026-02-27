@@ -184,7 +184,7 @@ async function startInteractiveMute(context, target, member) {
                     }, durationMs);
                 }
 
-                addSanction(i.guild.id, target.id, 'tempmute', selections.level, user.tag, null, selections.category, selections.gravityLabel);
+                await addSanction(i.guild.id, target.id, 'tempmute', selections.level, user.tag, null, selections.category, selections.gravityLabel);
 
                 const { logModAction } = require('./utils/logHelper');
                 await logModAction(i.guild, {
