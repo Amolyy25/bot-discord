@@ -379,7 +379,88 @@ client.on('interactionCreate', async interaction => {
         // Optionnel: désactiver les boutons pour éviter le spam, ou juste laisser tel quel
         
         await interaction.message.edit({ embeds: [newEmbed], components: [] }); 
-        await interaction.reply({ content: '✅ Signalement marqué comme traité.', flags: 64 });
+        await interaction.reply({ content: `✅ Signalement marqué comme traité.`, flags: 64 });
+        return;
+    }
+
+    // Gestion du bouton "Devenir STAFF"
+    if (interaction.isButton() && interaction.customId === 'staff_apply') {
+        const categoryId = '1476976724481933407';
+        const staffRoleId = '1469071689831940308';
+        const { ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+
+        // Vérifier si un ticket existe déjà pour cet utilisateur dans cette catégorie
+        const existingChannel = interaction.guild.channels.cache.find(c => 
+            c.parentId === categoryId && 
+            c.name === `staff-${interaction.user.username.toLowerCase()}`
+        );
+
+        if (existingChannel) {
+            return interaction.reply({ content: `❌ Vous avez déjà un ticket ouvert : ${existingChannel}`, flags: 64 });
+        }
+
+        try {
+            const ticketChannel = await interaction.guild.channels.create({
+                name: `staff-${interaction.user.username}`,
+                type: ChannelType.GuildText,
+                parent: categoryId,
+                permissionOverwrites: [
+                    {
+                        id: interaction.guild.id,
+                        deny: [PermissionFlagsBits.ViewChannel],
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks],
+                    },
+                    {
+                        id: staffRoleId,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks],
+                    }
+                ],
+                reason: `Candidature Staff de ${interaction.user.tag}`
+            });
+
+            const closeRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('staff_ticket_close')
+                    .setLabel('Fermer le ticket')
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+            const welcomeEmbed = new EmbedBuilder()
+                .setTitle('CANDIDATURE STAFF')
+                .setDescription(`Bonjour <@${interaction.user.id}>,\n\nMerci de l'intérêt que vous portez au SECTEUR ! Un membre de la haute société (<@&${staffRoleId}>) va s'occuper de vous d'ici peu.\n\nEn attendant, n'hésitez pas à préparer votre présentation.`)
+                .setColor(0xFFFFFF)
+                .setTimestamp();
+
+            await ticketChannel.send({
+                content: `<@${interaction.user.id}> | <@&${staffRoleId}>`,
+                embeds: [welcomeEmbed],
+                components: [closeRow]
+            });
+
+            await interaction.reply({ content: `✅ Votre ticket a été créé : ${ticketChannel}`, flags: 64 });
+        } catch (error) {
+            console.error('Erreur lors de la création du ticket staff:', error);
+            await interaction.reply({ content: '❌ Une erreur est survenue lors de la création de votre ticket.', flags: 64 });
+        }
+        return;
+    }
+
+    // Gestion de la fermeture du ticket STAFF
+    if (interaction.isButton() && interaction.customId === 'staff_ticket_close') {
+        const staffRoleId = '1469071689831940308';
+        const { PermissionFlagsBits } = require('discord.js');
+
+        if (!interaction.member.roles.cache.has(staffRoleId) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: '❌ Seul un membre du staff ou un administrateur peut fermer ce ticket.', flags: 64 });
+        }
+
+        await interaction.reply({ content: 'Fermeture du ticket dans 5 secondes...' });
+        setTimeout(() => {
+            interaction.channel.delete().catch(() => {});
+        }, 5000);
         return;
     }
 
