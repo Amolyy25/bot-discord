@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -42,6 +42,7 @@ const client = new Client({
         GatewayIntentBits.GuildModeration,
         GatewayIntentBits.GuildInvites,
         GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildWebhooks,
         GatewayIntentBits.GuildMessageReactions, // Ajout de l'intent pour les réactions
         GatewayIntentBits.GuildPresences // Requis pour le comptage des membres en ligne
     ],
@@ -200,8 +201,8 @@ client.on(Events.ChannelDelete, async (channel) => {
 });
 
 // Mass Roles
-client.on(Events.RoleCreate, async (role) => {
-    console.log(`[AntiNuke-Debug] Événement RoleCreate détecté: ${role.name}`);
+client.on(Events.GuildRoleCreate, async (role) => {
+    console.log(`[AntiNuke-Debug] Événement GuildRoleCreate détecté: ${role.name}`);
     try {
         const fetchedLogs = await role.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleCreate });
         const log = fetchedLogs.entries.first();
@@ -216,12 +217,18 @@ client.on(Events.RoleCreate, async (role) => {
     }
 });
 
-client.on(Events.RoleDelete, async (role) => {
+client.on(Events.GuildRoleDelete, async (role) => {
+    console.log(`[AntiNuke-Debug] Événement GuildRoleDelete détecté: ${role.name}`);
     try {
         const fetchedLogs = await role.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleDelete });
         const log = fetchedLogs.entries.first();
-        if (log && log.executorId) await antinuke.trackStaffAction(role.guild, log.executorId, 'CHANNELS_ROLES');
-    } catch (e) {}
+        if (log && log.executorId) {
+            console.log(`[AntiNuke-Debug] ExecutorID RoleDelete: ${log.executorId}`);
+            await antinuke.trackStaffAction(role.guild, log.executorId, 'CHANNELS_ROLES');
+        }
+    } catch (e) {
+        console.error('[AntiNuke-Debug] Erreur role delete logs:', e);
+    }
 });
 
 // Mass Promotion / Roles addition
