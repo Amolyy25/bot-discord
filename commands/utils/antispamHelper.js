@@ -982,10 +982,32 @@ async function handleMessage(message) {
   // Ignorer les DMs
   if (!message.guild) return false;
 
-  // Ignorer les staff
-  if (isStaff(message.member)) return false;
-
   const userData = getUserData(message.author.id);
+
+  // === PROTECTION "NOUVEAUX" ===
+  const accountAgeMs = Date.now() - message.author.createdTimestamp;
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  
+  if (accountAgeMs < sevenDaysMs) {
+      // Si c'est un nouveau compte, on vérifie s'il doit subir le slowmode
+      // On utilise un tracker local pour simuler un slowmode de 10s par utilisateur
+      const lastMsg = userData.lastNewAccountMsg || 0;
+      if (Date.now() - lastMsg < 10000) {
+          try {
+              await message.delete();
+              // Optionnel: avertir l'utilisateur une fois
+              if (!userData.notifiedSlowmode) {
+                  await message.channel.send(`${message.author} Votre compte a moins de 7 jours, vous êtes limité à 1 message toutes les 10 secondes.`).then(m => setTimeout(() => m.delete().catch(()=> {}), 5000));
+                  userData.notifiedSlowmode = true;
+              }
+          } catch (e) {}
+          return true;
+      }
+      userData.lastNewAccountMsg = Date.now();
+  }
+
+  // Ignorer les staff pour la suite
+  if (isStaff(message.member)) return false;
 
   // === GESTION DU SPAM EN COURS ===
   if (userData.isSpamming) {

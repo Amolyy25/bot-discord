@@ -7,8 +7,11 @@ const cron = require('node-cron');
 const statsCommand = require('./commands/stats.js');
 const antispam = require('./commands/utils/antispamHelper');
 const jackpot = require('./commands/utils/jackpotHelper');
+const antinuke = require('./commands/utils/antiNukeHelper');
 const { initDB } = require('./commands/utils/db');
 const { migrateSanctions } = require('./commands/utils/sanctionsHelper');
+const { ROLES } = require('./commands/utils/permHelper');
+const { AuditLogEvent } = require('discord.js');
 
 // Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
 const PORT = process.env.PORT || 8080;
@@ -38,6 +41,7 @@ const client = new Client({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildModeration,
         GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessageReactions, // Ajout de l'intent pour les réactions
         GatewayIntentBits.GuildPresences // Requis pour le comptage des membres en ligne
     ],
@@ -131,6 +135,95 @@ client.on('messageDelete', async (message) => {
     if (channelSnipes.length > 15) {
         channelSnipes.pop();
     }
+});
+
+// --- Système Anti-Nuke (Surveillance Events) ---
+
+// Mass Ban
+client.on(Events.GuildBanAdd, async (ban) => {
+    try {
+        const fetchedLogs = await ban.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberBanAdd });
+        const banLog = fetchedLogs.entries.first();
+        if (banLog && banLog.executorId) {
+            await antinuke.trackStaffAction(ban.guild, banLog.executorId, 'BAN_KICK');
+        }
+    } catch (e) {}
+});
+
+// Mass Kick
+client.on(Events.GuildMemberRemove, async (member) => {
+    try {
+        const fetchedLogs = await member.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberKick });
+        const kickLog = fetchedLogs.entries.first();
+        if (kickLog && kickLog.targetId === member.id && (Date.now() - kickLog.createdTimestamp < 5000)) {
+            await antinuke.trackStaffAction(member.guild, kickLog.executorId, 'BAN_KICK');
+        }
+    } catch (e) {}
+});
+
+// Mass Channels
+client.on(Events.ChannelCreate, async (channel) => {
+    if (!channel.guild) return;
+    try {
+        const fetchedLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelCreate });
+        const log = fetchedLogs.entries.first();
+        if (log && log.executorId) await antinuke.trackStaffAction(channel.guild, log.executorId, 'CHANNELS_ROLES');
+    } catch (e) {}
+});
+
+client.on(Events.ChannelDelete, async (channel) => {
+    if (!channel.guild) return;
+    try {
+        const fetchedLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelDelete });
+        const log = fetchedLogs.entries.first();
+        if (log && log.executorId) await antinuke.trackStaffAction(channel.guild, log.executorId, 'CHANNELS_ROLES');
+    } catch (e) {}
+});
+
+// Mass Roles
+client.on(Events.RoleCreate, async (role) => {
+    try {
+        const fetchedLogs = await role.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleCreate });
+        const log = fetchedLogs.entries.first();
+        if (log && log.executorId) await antinuke.trackStaffAction(role.guild, log.executorId, 'CHANNELS_ROLES');
+    } catch (e) {}
+});
+
+client.on(Events.RoleDelete, async (role) => {
+    try {
+        const fetchedLogs = await role.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleDelete });
+        const log = fetchedLogs.entries.first();
+        if (log && log.executorId) await antinuke.trackStaffAction(role.guild, log.executorId, 'CHANNELS_ROLES');
+    } catch (e) {}
+});
+
+// Mass Promotion / Roles addition
+client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+    const addedRoles = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
+    if (addedRoles.size > 0) {
+        try {
+            const fetchedLogs = await newMember.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberRoleUpdate });
+            const log = fetchedLogs.entries.first();
+            if (log && log.executorId && log.executorId !== client.user.id) {
+                const importantRoles = [ROLES.PERM_1, ROLES.PERM_2, ROLES.PERM_3, ROLES.PERM_4, ROLES.PERM_5, ROLES.SOUVERAIN];
+                if (addedRoles.some(r => importantRoles.includes(r.id) || r.permissions.has(PermissionFlagsBits.Administrator))) {
+                    await antinuke.trackStaffAction(newMember.guild, log.executorId, 'PROMOTIONS');
+                }
+            }
+        } catch (e) {}
+    }
+});
+
+// Anti-Webhook
+client.on(Events.WebhooksUpdate, async (channel) => {
+    try {
+        const fetchedLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.WebhookCreate });
+        const log = fetchedLogs.entries.first();
+        if (log && log.executorId && log.executorId !== channel.guild.ownerId) {
+            const staffMember = await channel.guild.members.fetch(log.executorId).catch(() => null);
+            await antinuke.sanctionStaff(channel.guild, staffMember, 'Création de Webhook (Owner Only)');
+        }
+    } catch (e) {}
 });
 
 client.on('interactionCreate', async interaction => {
@@ -495,19 +588,35 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
+    // Vérification des permissions et quotas
+    const { checkPermission } = require('./commands/utils/permHelper');
+    const permResult = checkPermission(interaction.member, interaction.commandName);
+    
+    if (permResult === 'quota_reached') {
+        return interaction.reply({ content: '❌ Quota d\'utilisation horaire atteint pour cette commande.', flags: 64 });
+    } else if (permResult !== true) {
+        return interaction.reply({ content: '❌ Vous n\'avez pas la permission d\'utiliser cette commande.', flags: 64 });
+    }
+
     try {
         await command.execute(interaction, client, snipes);
         
-        // Vérifier si un rôle doit être consommé (retiré après usage)
+        // Surveillance Anti-Nuke pour les commandes de modération
+        const modCommands = ['kick', 'ban'];
+        if (modCommands.includes(interaction.commandName)) {
+            await antinuke.trackStaffAction(interaction.guild, interaction.user.id, 'BAN_KICK');
+        }
+
+        // Vérifier si un rôle doit être consommé
         try {
             const { checkAndConsumeRole } = require('./commands/utils/permHelper');
-            await checkAndConsumeRole(interaction.member, command.data.name);
-        } catch (e) {
-            console.error('Erreur checkAndConsumeRole:', e);
-        }
+            await checkAndConsumeRole(interaction.member, interaction.commandName);
+        } catch (e) {}
     } catch (error) {
         console.error(error);
-        await interaction.reply({ content: 'Erreur lors de l\'exécution de la commande!', flags: 64 });
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: 'Erreur lors de l\'exécution de la commande!', flags: 64 });
+        }
     }
 });
 
@@ -599,16 +708,30 @@ client.on('messageCreate', async message => {
     const command = client.commands.get(commandName);
     if (!command) return;
 
+    // Vérification des permissions et quotas
+    const { checkPermission } = require('./commands/utils/permHelper');
+    const permResult = checkPermission(message.member, commandName);
+    
+    if (permResult === 'quota_reached') {
+        return message.reply('❌ Quota d\'utilisation horaire atteint pour cette commande.');
+    } else if (permResult !== true) {
+        return message.reply('❌ Vous n\'avez pas la permission d\'utiliser cette commande.');
+    }
+
     try {
         await command.executeMessage(message, args, client, snipes);
         
-        // Vérifier si un rôle doit être consommé (retiré après usage)
+        // Surveillance Anti-Nuke pour les commandes de modération
+        const modCommands = ['kick', 'ban'];
+        if (modCommands.includes(commandName)) {
+            await antinuke.trackStaffAction(message.guild, message.author.id, 'BAN_KICK');
+        }
+
+        // Vérifier si un rôle doit être consommé
         try {
             const { checkAndConsumeRole } = require('./commands/utils/permHelper');
             await checkAndConsumeRole(message.member, commandName);
-        } catch (e) {
-            console.error('Erreur checkAndConsumeRole:', e);
-        }
+        } catch (e) {}
     } catch (error) {
         console.error(error);
         message.reply('Erreur lors de l\'exécution de la commande!');

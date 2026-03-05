@@ -25,7 +25,7 @@ module.exports = {
                 .setRequired(false)),
 
     async execute(interaction) {
-        const commandName = interaction.options.getString('commande').toLowerCase();
+        const commandName = interaction.options.getString('commande').toLowerCase().replace(/^[-!/]+/, '');
         const user = interaction.options.getUser('utilisateur');
         const role = interaction.options.getRole('role');
         const limit = interaction.options.getInteger('limite');
@@ -59,7 +59,7 @@ module.exports = {
             return message.reply('❌ Usage: `-addperm <commande> <@user|@role> [limite]`');
         }
 
-        const commandName = args[0].toLowerCase();
+        const commandName = args[0].toLowerCase().replace(/^[-!/]+/, '');
         const user = message.mentions.users.first();
         const role = message.mentions.roles.first();
         

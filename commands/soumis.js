@@ -22,7 +22,9 @@ module.exports = {
 
         const adminStatus = isAdmin(interaction.member);
         const isGeneral = interaction.channel.name.toLowerCase().includes('general');
-        if (!isModChannel(interaction.channelId) && !isGeneral && !adminStatus) return;
+        if (!isModChannel(interaction.channelId) && !isGeneral && !adminStatus) {
+            return interaction.reply({ content: '❌ Vous ne pouvez pas utiliser cette commande dans ce salon.', flags: 64 });
+        }
         const target = interaction.options.getUser('utilisateur');
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
@@ -71,6 +73,7 @@ module.exports = {
             });
             
             await interaction.reply({ content: `${target} a été soumis par **${interaction.user.tag}** !` });
+            await require('./utils/permHelper').checkAndConsumeRole(interaction.member, 'soumis');
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'Erreur lors de la soumission!', flags: 64 });
@@ -87,7 +90,9 @@ module.exports = {
 
         const adminStatus = isAdmin(message.member);
         const isGeneral = message.channel.name.toLowerCase().includes('general');
-        if (!isModChannel(message.channel.id) && !isGeneral && !adminStatus) return;
+        if (!isModChannel(message.channel.id) && !isGeneral && !adminStatus) {
+            return message.reply('❌ Vous ne pouvez pas utiliser cette commande dans ce salon.');
+        }
 
         const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
         if (!target) return message.reply('Usage: -soumis @utilisateur ou ID');
@@ -135,6 +140,7 @@ module.exports = {
             });
 
             await message.channel.send({ content: `${target} a été soumis par **${message.author.tag}** !` });
+            await require('./utils/permHelper').checkAndConsumeRole(message.member, 'soumis');
         } catch (error) {
             console.error(error);
             message.reply('Erreur lors de la soumission!');

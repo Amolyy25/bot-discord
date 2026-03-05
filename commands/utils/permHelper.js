@@ -219,62 +219,193 @@ function hasDynamicPermission(member, commandName) {
 // --- Logique Existante ---
 
 const ROLES = {
-    BOOSTER: '1469314101615398995',
+    PERM_1: '1469071689756442805',
     PERM_2: '1469071689768767589',
-    STAFF_TEST: '1469071689831940310',
-    STAFF: '1469071689848721510',
-    PERM_3: '1469071689768767590'
+    PERM_3: '1469071689768767590',
+    PERM_4: '1469071689768767591',
+    PERM_5: '1476184863404200061',
+    SOUVERAIN: '1475894024866107504',
+    BOOSTER: '1469314101615398995',
+    SOUMIS: 'soumis' // Nom du rôle ou ID si fixe
 };
 
 const MOD_CHANNEL_ID = '1469258215916175392';
-const GENERAL_CHANNEL_ID = '1469071691941412962';
+const ADMIN_PING_ID = '1172869002670903422';
+
+// Mapping des commandes par niveau de permission
+const COMMAND_PERMS = {
+    // Perm I
+    'warn': ROLES.PERM_1,
+    'userinfo': ROLES.PERM_1,
+    'pic': ROLES.PERM_1,
+    'banner': ROLES.PERM_1,
+    'immune_spam': ROLES.PERM_1,
+    'immune_antiraid': ROLES.PERM_1,
+
+    // Perm II
+    'tempmute': ROLES.PERM_2,
+    'unmute': ROLES.PERM_2,
+    'vmute': ROLES.PERM_2,
+    'vunmute': ROLES.PERM_2,
+
+    // Perm III
+    'sanctions': ROLES.PERM_3,
+    'vkick': ROLES.PERM_3,
+    'snipe': ROLES.PERM_3,
+    'fake': ROLES.PERM_3,
+    'vmoveall': ROLES.PERM_3,
+    'vgather': ROLES.PERM_3,
+
+    // Perm IV
+    'mute': ROLES.PERM_4,
+    'vlock': ROLES.PERM_4,
+    'vunlock': ROLES.PERM_4,
+    'kick': ROLES.PERM_4,
+
+    // Perm V
+    'lock': ROLES.PERM_5,
+    'vclear': ROLES.PERM_5,
+    'soumis': ROLES.PERM_5,
+    'bl': ROLES.PERM_5,
+    'unsoumis': ROLES.PERM_5,
+
+    // Spécial
+    'rankup': ROLES.SOUVERAIN
+};
+
+// Quotas de modération (utilisations par heure)
+const COMMAND_QUOTAS = {
+    'unmute': { limit: 10, window: 3600000 },
+    'tempmute': { limit: 10, window: 3600000 },
+    'mute': { limit: 2, window: 3600000 },
+    'kick': { limit: 3, window: 3600000 },
+    'lock': { limit: 2, window: 3600000 },
+    'vlock': { limit: 2, window: 3600000 }
+};
+
+// Suivi des quotas en mémoire (clé: userId-commandName)
+const quotaTracker = new Map();
+
+/**
+ * Vérifie si une commande respecte son quota horaire
+ */
+function checkQuota(userId, commandName) {
+    const quota = COMMAND_QUOTAS[commandName];
+    if (!quota) return true;
+
+    const key = `${userId}-${commandName}`;
+    const now = Date.now();
+    let usages = quotaTracker.get(key) || [];
+
+    // Nettoyer les vieux usages
+    usages = usages.filter(t => now - t < quota.window);
+
+    if (usages.length >= quota.limit) return false;
+
+    usages.push(now);
+    quotaTracker.set(key, usages);
+    return true;
+}
+
+/**
+ * Vérifie si un membre a le rôle requis (hiérarchie cumulative)
+ */
+function hasPermLevel(member, requiredRoleId) {
+    if (!member) return false;
+    if (isAdmin(member)) return true;
+
+    const memberRoles = member.roles.cache;
+    
+    // Hiérarchie cumulative : Perm V > IV > III > II > I
+    const hierarchy = [
+        ROLES.PERM_1,
+        ROLES.PERM_2,
+        ROLES.PERM_3,
+        ROLES.PERM_4,
+        ROLES.PERM_5
+    ];
+
+    const requiredIndex = hierarchy.indexOf(requiredRoleId);
+    
+    // Si c'est un rôle de la hiérarchie standard
+    if (requiredIndex !== -1) {
+        // Le membre a-t-il un rôle de niveau égal ou supérieur ?
+        for (let i = requiredIndex; i < hierarchy.length; i++) {
+            if (memberRoles.has(hierarchy[i])) return true;
+        }
+    }
+
+    // Cas spécial SOUVERAIN (accès Perm II et III)
+    if (memberRoles.has(ROLES.SOUVERAIN)) {
+        if (requiredRoleId === ROLES.SOUVERAIN) return true;
+        if (requiredRoleId === ROLES.PERM_1 || requiredRoleId === ROLES.PERM_2 || requiredRoleId === ROLES.PERM_3) return true;
+    }
+
+    // Cas direct (si ce n'est pas dans la hiérarchie cumulative, ex: BOOSTER)
+    if (memberRoles.has(requiredRoleId)) return true;
+
+    return false;
+}
 
 function hasAnyRole(member, roleIds) {
     if (!member) return false;
-    // Si roleIds est un tableau de tableaux (pour compatibilité ancienne), on aplatit
-    const ids = roleIds.flat(); 
+    const ids = Array.isArray(roleIds) ? roleIds.flat() : [roleIds];
     return ids.some(id => member.roles.cache.has(id));
 }
 
 function isAdmin(member) {
     if (!member) return false;
-    return member.permissions.has(PermissionFlagsBits.Administrator);
+    return member.permissions.has(PermissionFlagsBits.Administrator) || member.id === member.guild.ownerId;
 }
 
 /**
  * Vérifie globalement si un utilisateur peut exécuter une commande
- * @param {import('discord.js').GuildMember} member 
- * @param {string} commandName Nom de la commande
- * @param {Function} defaultCheck Fonction de vérification par défaut (ancienne logique)
  */
 function checkPermission(member, commandName) {
-    // 1. Admin a toujours accès
     if (isAdmin(member)) return true;
 
-    // 2. Vérification dynamique (ajoutée via /addperm)
+    // 1. Vérification du quota
+    if (!checkQuota(member.id, commandName)) {
+        console.log(`[PermHelper] Quota atteint pour ${member.user.tag} sur ${commandName}`);
+        return 'quota_reached';
+    }
+
+    // 2. Vérification Hiérarchie Fixe
+    const requiredRole = COMMAND_PERMS[commandName];
+    if (requiredRole && hasPermLevel(member, requiredRole)) return true;
+
+    // 3. Vérification Dynamique (ajoutée via /addperm)
     if (hasDynamicPermission(member, commandName)) return true;
 
     return false;
 }
 
+function getStaffLevel(member) {
+    if (member.roles.cache.has(ROLES.SOUVERAIN)) return 6;
+    if (member.roles.cache.has(ROLES.PERM_5)) return 5;
+    if (member.roles.cache.has(ROLES.PERM_4)) return 4;
+    if (member.roles.cache.has(ROLES.PERM_3)) return 3;
+    if (member.roles.cache.has(ROLES.PERM_2)) return 2;
+    if (member.roles.cache.has(ROLES.PERM_1)) return 1;
+    return 0;
+}
+
 module.exports = {
     ROLES,
     MOD_CHANNEL_ID,
-    GENERAL_CHANNEL_ID,
+    ADMIN_PING_ID,
     
     isAdmin,
     hasAnyRole,
+    hasPermLevel,
+    getStaffLevel,
     
-    // Nouvelles fonctions exportées
     addPermission,
     removePermission,
     checkPermission,
     checkAndConsumeRole,
     loadPermissions,
 
-    // Wrappers rétro-compatibles
     isModChannel: (channelId) => channelId === MOD_CHANNEL_ID,
-
-    // On garde uniquement celui-ci car la consigne précise "à part le rôle BOOSTER qu'il faut laisser intact"
-    isBoosterOrPerm2: (member) => checkPermission(member, 'booster_perm2') || hasAnyRole(member, [ROLES.BOOSTER, ROLES.PERM_2, ROLES.PERM_3, ROLES.STAFF_TEST, ROLES.STAFF])
+    isBoosterOrPerm2: (member) => member.roles.cache.has(ROLES.BOOSTER) || hasPermLevel(member, ROLES.PERM_2)
 };
