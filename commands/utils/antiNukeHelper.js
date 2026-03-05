@@ -24,7 +24,12 @@ function getStaffData(userId) {
  * Sanctionne un staff (Anti-Nuke)
  */
 async function sanctionStaff(guild, staffMember, reason) {
-    if (!staffMember || !staffMember.manageable) return;
+    console.log(`[AntiNuke] Tentative de sanction pour ${staffMember?.user?.tag || 'Staff inconnu'}. Raison: ${reason}`);
+    if (!staffMember) return;
+    if (!staffMember.manageable) {
+        console.log(`[AntiNuke] ❌ ÉCHEC: Je ne peux pas sanctionner ${staffMember.user.tag}. Ma position dans la hiérarchie des rôles est trop basse ou il est ADMIN/OWNER et je n'ai pas les droits suffisants.`);
+        // On continue quand même pour essayer d'envoyer l'alerte
+    }
 
     // 1. Sauvegarder les rôles et tout retirer
     const removableRoles = staffMember.roles.cache.filter(r => r.name !== '@everyone' && !r.managed);
@@ -68,10 +73,17 @@ async function sanctionStaff(guild, staffMember, reason) {
  * Traite une action effectuée par un staff
  */
 async function trackStaffAction(guild, userId, type) {
-    if (userId === guild.ownerId) return; // L'owner est immunisé
+    console.log(`[AntiNuke] Action détectée: ${type} par ${userId}`);
+    if (userId === guild.ownerId) {
+        console.log(`[AntiNuke] Owner immunisé (${userId})`);
+        return;
+    }
 
     const staffMember = await guild.members.fetch(userId).catch(() => null);
-    if (!staffMember) return;
+    if (!staffMember) {
+        console.log(`[AntiNuke] Erreur: Impossible de fetch le membre ${userId}`);
+        return;
+    }
 
     const staffData = getStaffData(userId);
     const now = Date.now();
@@ -79,16 +91,16 @@ async function trackStaffAction(guild, userId, type) {
 
     if (!threshold) return;
 
-    // Nettoyer les accès obsolètes
+    // Ajouter l'action
     const actionList = type === 'BAN_KICK' ? staffData.banKick : 
                       type === 'CHANNELS_ROLES' ? staffData.channelsRoles : 
                       staffData.promotions;
 
-    // Ajouter l'action
     actionList.push(now);
 
     // Filtrer par fenêtre
     const recentActions = actionList.filter(t => now - t < threshold.window);
+    console.log(`[AntiNuke] Activité de ${staffMember.user.tag}: ${recentActions.length}/${threshold.limit + 1} actions en cours (${type})`);
     
     // Mettre à jour la liste filtrée
     if (type === 'BAN_KICK') staffData.banKick = recentActions;
@@ -97,6 +109,7 @@ async function trackStaffAction(guild, userId, type) {
 
     // Vérifier dépassement
     if (recentActions.length > threshold.limit) {
+        console.log(`[AntiNuke] SEUIL DÉPASSÉ pour ${staffMember.user.tag} (${type})`);
         let reason = '';
         if (type === 'BAN_KICK') reason = `Mass Ban/Kick (${recentActions.length} en 1 min)`;
         if (type === 'CHANNELS_ROLES') reason = `Mass Channel/Role mutations (${recentActions.length} en 10 sec)`;

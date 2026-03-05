@@ -141,52 +141,79 @@ client.on('messageDelete', async (message) => {
 
 // Mass Ban
 client.on(Events.GuildBanAdd, async (ban) => {
+    console.log(`[AntiNuke-Debug] Événement GuildBanAdd détecté pour ${ban.user.tag}`);
     try {
         const fetchedLogs = await ban.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberBanAdd });
         const banLog = fetchedLogs.entries.first();
         if (banLog && banLog.executorId) {
             await antinuke.trackStaffAction(ban.guild, banLog.executorId, 'BAN_KICK');
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('[AntiNuke-Debug] Erreur ban logs:', e);
+    }
 });
 
 // Mass Kick
 client.on(Events.GuildMemberRemove, async (member) => {
+    console.log(`[AntiNuke-Debug] Événement GuildMemberRemove (Potentiel Kick) détecté pour ${member.user.tag}`);
     try {
         const fetchedLogs = await member.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberKick });
         const kickLog = fetchedLogs.entries.first();
         if (kickLog && kickLog.targetId === member.id && (Date.now() - kickLog.createdTimestamp < 5000)) {
+            console.log(`[AntiNuke-Debug] Kick confirmé par ${kickLog.executorId}`);
             await antinuke.trackStaffAction(member.guild, kickLog.executorId, 'BAN_KICK');
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('[AntiNuke-Debug] Erreur kick logs:', e);
+    }
 });
 
 // Mass Channels
 client.on(Events.ChannelCreate, async (channel) => {
     if (!channel.guild) return;
+    console.log(`[AntiNuke-Debug] Événement ChannelCreate détecté: ${channel.name}`);
     try {
         const fetchedLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelCreate });
         const log = fetchedLogs.entries.first();
-        if (log && log.executorId) await antinuke.trackStaffAction(channel.guild, log.executorId, 'CHANNELS_ROLES');
-    } catch (e) {}
+        if (log && log.executorId) {
+            console.log(`[AntiNuke-Debug] ExecutorID ChannelCreate: ${log.executorId}`);
+            await antinuke.trackStaffAction(channel.guild, log.executorId, 'CHANNELS_ROLES');
+        }
+    } catch (e) {
+        console.error('[AntiNuke-Debug] Erreur channel logs:', e);
+    }
 });
 
 client.on(Events.ChannelDelete, async (channel) => {
     if (!channel.guild) return;
+    console.log(`[AntiNuke-Debug] Événement ChannelDelete détecté: ${channel.name}`);
     try {
         const fetchedLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelDelete });
         const log = fetchedLogs.entries.first();
-        if (log && log.executorId) await antinuke.trackStaffAction(channel.guild, log.executorId, 'CHANNELS_ROLES');
-    } catch (e) {}
+        if (log && log.executorId) {
+            console.log(`[AntiNuke-Debug] ExecutorID ChannelDelete: ${log.executorId}`);
+            await antinuke.trackStaffAction(channel.guild, log.executorId, 'CHANNELS_ROLES');
+        }
+    } catch (e) {
+        console.error('[AntiNuke-Debug] Erreur channel delete logs:', e);
+    }
 });
 
 // Mass Roles
 client.on(Events.RoleCreate, async (role) => {
+    console.log(`[AntiNuke-Debug] Événement RoleCreate détecté: ${role.name}`);
     try {
         const fetchedLogs = await role.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.RoleCreate });
         const log = fetchedLogs.entries.first();
-        if (log && log.executorId) await antinuke.trackStaffAction(role.guild, log.executorId, 'CHANNELS_ROLES');
-    } catch (e) {}
+        if (log && log.executorId) {
+            console.log(`[AntiNuke-Debug] ExecutorID RoleCreate: ${log.executorId}`);
+            await antinuke.trackStaffAction(role.guild, log.executorId, 'CHANNELS_ROLES');
+        } else {
+             console.log('[AntiNuke-Debug] Aucun log Audit trouvé pour RoleCreate');
+        }
+    } catch (e) {
+        console.error('[AntiNuke-Debug] Erreur role logs:', e);
+    }
 });
 
 client.on(Events.RoleDelete, async (role) => {
@@ -201,29 +228,40 @@ client.on(Events.RoleDelete, async (role) => {
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     const addedRoles = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
     if (addedRoles.size > 0) {
+        console.log(`[AntiNuke-Debug] Événement Role Update pour ${newMember.user.tag} (+${addedRoles.size} rôles)`);
         try {
             const fetchedLogs = await newMember.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberRoleUpdate });
             const log = fetchedLogs.entries.first();
             if (log && log.executorId && log.executorId !== client.user.id) {
+                console.log(`[AntiNuke-Debug] Update par ${log.executorId}`);
                 const importantRoles = [ROLES.PERM_1, ROLES.PERM_2, ROLES.PERM_3, ROLES.PERM_4, ROLES.PERM_5, ROLES.SOUVERAIN];
                 if (addedRoles.some(r => importantRoles.includes(r.id) || r.permissions.has(PermissionFlagsBits.Administrator))) {
+                    console.log('[AntiNuke-Debug] Rôle important détecté, track action...');
                     await antinuke.trackStaffAction(newMember.guild, log.executorId, 'PROMOTIONS');
+                } else {
+                    console.log('[AntiNuke-Debug] Aucun rôle important dans les nouveaux rôles.');
                 }
             }
-        } catch (e) {}
+        } catch (e) {
+             console.error('[AntiNuke-Debug] Erreur update logs:', e);
+        }
     }
 });
 
 // Anti-Webhook
 client.on(Events.WebhooksUpdate, async (channel) => {
+    console.log(`[AntiNuke-Debug] Événement WebhooksUpdate dans ${channel.name}`);
     try {
         const fetchedLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.WebhookCreate });
         const log = fetchedLogs.entries.first();
         if (log && log.executorId && log.executorId !== channel.guild.ownerId) {
+            console.log(`[AntiNuke-Debug] Webhook par un non-owner: ${log.executorId}`);
             const staffMember = await channel.guild.members.fetch(log.executorId).catch(() => null);
             await antinuke.sanctionStaff(channel.guild, staffMember, 'Création de Webhook (Owner Only)');
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('[AntiNuke-Debug] Erreur webhook logs:', e);
+    }
 });
 
 client.on('interactionCreate', async interaction => {
