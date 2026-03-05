@@ -276,14 +276,15 @@ const COMMAND_PERMS = {
     'rankup': ROLES.SOUVERAIN
 };
 
-// Quotas de modération (utilisations par heure)
+// Quotas de modération (utilisations par heure/fenêtre)
 const COMMAND_QUOTAS = {
     'unmute': { limit: 10, window: 3600000 },
     'tempmute': { limit: 10, window: 3600000 },
     'mute': { limit: 2, window: 3600000 },
-    'kick': { limit: 3, window: 3600000 },
+    'kick': { limit: 3, window: 60000 }, // Anti-Nuke: 3 kicks / 1 min
     'lock': { limit: 2, window: 3600000 },
-    'vlock': { limit: 2, window: 3600000 }
+    'soumis': { limit: 2, window: 3600000 },
+    'rankup': { limit: 1, window: 7 * 24 * 60 * 60 * 1000 }
 };
 
 // Suivi des quotas en mémoire (clé: userId-commandName)

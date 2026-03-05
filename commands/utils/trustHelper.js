@@ -1,5 +1,5 @@
 const { pool } = require('./db');
-const { ROLES, MOD_CHANNEL_ID } = require('./permHelper');
+const { ROLES, MOD_CHANNEL_ID, ADMIN_PING_ID } = require('./permHelper');
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 
 // Cache local pour éviter de spam la DB
@@ -11,6 +11,10 @@ const SCORE_THRESHOLDS = {
     SUSPECT: 50,
     NEUTRE: 80
 };
+
+// Listes de mots
+const VULGARITY_WORDS = ['merde', 'con', 'putain', 'chier', 'ta gueule']; // Liste 1
+const HATE_WORDS = ['bougnoule', 'nègre', 'pd', 'pédé', 'salope', 'hitler', 'nazi']; // Liste 2 (Exemples)
 
 /**
  * Initialise ou récupère le score d'un utilisateur
@@ -29,7 +33,8 @@ async function getTrustData(userId) {
                 trust_score: 30,
                 total_messages: 0,
                 is_shadow_muted: false,
-                weekly_constructive_count: 0
+                weekly_constructive_count: 0,
+                muted_until: null
             };
             await pool.query(
                 'INSERT INTO user_trust (user_id, trust_score, total_messages, is_shadow_muted) VALUES ($1, $2, $3, $4)',
@@ -40,23 +45,92 @@ async function getTrustData(userId) {
         }
     } catch (err) {
         console.error('[TrustHelper] Erreur getTrustData:', err);
-        return { trust_score: 30, is_shadow_muted: false };
+        return { trust_score: 30, is_shadow_muted: false, muted_until: null };
+    }
+}
+
+/**
+ * Applique le statut @soumis (Severe Tempmute + Rôle)
+ */
+async function applySoumis(member, durationHours = 24, reason = 'Automatique Sentinel') {
+    const until = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+    
+    try {
+        // 1. Gérer le rôle @soumis
+        let soumisRole = member.guild.roles.cache.find(r => r.name.toLowerCase() === 'soumis');
+        if (!soumisRole) {
+            soumisRole = await member.guild.roles.create({
+                name: 'soumis',
+                color: '#010101',
+                permissions: 0n,
+                reason: 'Sentinel auto-create'
+            }).catch(() => null);
+        }
+
+        // 2. Sauvegarder les rôles et tout retirer
+        const { saveUserRoles } = require('./soumisHelper');
+        const removableRoles = member.roles.cache.filter(r => r.name !== '@everyone' && !r.managed);
+        const roleIds = removableRoles.map(r => r.id);
+        
+        if (roleIds.length > 0) {
+            saveUserRoles(member.guild.id, member.id, roleIds);
+            await member.roles.remove(removableRoles).catch(() => {});
+        }
+        if (soumisRole) await member.roles.add(soumisRole).catch(() => {});
+
+        // 3. Appliquer le timeout Discord (Tempmute sévère)
+        await member.timeout(durationHours * 60 * 60 * 1000, reason).catch(() => {});
+        
+        // 4. Enregistrer en DB
+        await pool.query('UPDATE user_trust SET muted_until = $1, trust_score = 30 WHERE user_id = $2', [until, member.id]);
+        
+        // 5. Log
+        const logChannel = member.guild.channels.cache.get(MOD_CHANNEL_ID);
+        if (logChannel) {
+            const embed = new EmbedBuilder()
+                .setTitle('🛡️ SENTINEL - NEUTRALISATION ACTIVÉE')
+                .setColor(0xFF0000)
+                .setDescription(`Le membre ${member} a été neutralisé (@soumis).`)
+                .addFields(
+                    { name: 'Raison', value: reason },
+                    { name: 'Durée', value: `${durationHours}h` },
+                    { name: 'Impact', value: 'Roles retirés + Timeout.' }
+                )
+                .setTimestamp();
+            await logChannel.send({ embeds: [embed] });
+        }
+
+        // Mettre à jour le cache
+        const data = await getTrustData(member.id);
+        data.trust_score = 30;
+        data.muted_until = until;
+        trustCache.set(member.id, data);
+    } catch (err) {
+        console.error('[TrustHelper] Erreur applySoumis:', err);
     }
 }
 
 /**
  * Met à jour le score et synchronise avec la DB
  */
-async function updateTrustScore(userId, change, reason = '') {
+async function updateTrustScore(guild, userId, change, reason = '') {
     const data = await getTrustData(userId);
     const oldScore = data.trust_score;
-    data.trust_score = Math.max(0, Math.min(100, data.trust_score + change));
+    data.trust_score = Math.max(-50, Math.min(100, data.trust_score + change));
     
     console.log(`[TrustScore] ${userId}: ${oldScore} -> ${data.trust_score} (${change > 0 ? '+' : ''}${change}) | Raison: ${reason}`);
 
     try {
         await pool.query('UPDATE user_trust SET trust_score = $1 WHERE user_id = $2', [data.trust_score, userId]);
         trustCache.set(userId, data);
+
+        // Vérification des seuils critiques
+        if (data.trust_score <= 0) {
+            const member = await guild.members.fetch(userId).catch(() => null);
+            if (member) {
+                await applySoumis(member, 24, `Score tombé à ${data.trust_score}: ${reason}`);
+            }
+        }
     } catch (err) {
         console.error('[TrustHelper] Erreur updateTrustScore:', err);
     }
@@ -98,17 +172,22 @@ async function handleNewMemberTrust(member) {
         reasons.push('Pas d\'avatar');
     }
 
-    // Pseudo suspect (caractères invisibles ou > 5 chiffres)
-    const invisibleChars = /[\u17b4\u17b5\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2061\u2062\u2063\u2064\u206a\u206b\u206c\u206d\u206e\u206f\ufeff]/;
-    const digitsCount = (member.displayName.match(/\d/g) || []).length;
-    if (invisibleChars.test(member.displayName) || digitsCount > 5) {
-        scoreChange -= 15;
-        reasons.push('Pseudo suspect');
-    }
+    // Bonus Ancienneté (5 pts par semaine)
+    // Ici calculé à l'entrée c'est bizarre, on devrait le faire au messageCreate ou via un cron.
+    // Mais on peut attribuer les points accumulés s'il revient.
 
     if (scoreChange !== 0) {
-        await updateTrustScore(member.id, scoreChange, reasons.join(', '));
+        await updateTrustScore(member.guild, member.id, scoreChange, reasons.join(', '));
     }
+
+    // Bonus Rôles
+    let roleBonus = 0;
+    const { ROLES } = require('./permHelper');
+    if (member.roles.cache.has(ROLES.SOUVERAIN)) roleBonus += 20;
+    if (member.roles.cache.has('1471431323645378766')) roleBonus += 20; // Rôle "Vérifié"
+    if (member.roles.cache.has('1471431323645378767')) roleBonus += 20; // Rôle "Prestige"
+
+    if (roleBonus > 0) await updateTrustScore(member.guild, member.id, roleBonus, 'Bonus Rôles/Vérification');
 }
 
 /**
@@ -122,37 +201,60 @@ async function checkComportementalMalus(message) {
 
     const content = message.content.toLowerCase();
     let scoreChange = 0;
-    const reasons = [];
+    let reason = '';
 
-    // 1. Toxic Filter (Simple/Basic list, user can expand)
-    const toxicWords = ['connard', 'salope', 'fdp', 'pute', 'encule', 'nique']; // Exemples
-    if (toxicWords.some(word => content.includes(word))) {
-        scoreChange -= 5;
-        reasons.push('Mot toxique');
+    // 1. Liste 2 : Haine Sévère (-40 pts)
+    if (HATE_WORDS.some(word => content.includes(word))) {
+        scoreChange = -40;
+        reason = 'Haine Sévère (Liste 2)';
+    } 
+    // 2. Vulgarité : Deletion simple
+    else if (VULGARITY_WORDS.some(word => content.includes(word))) {
+        await message.delete().catch(() => {});
+        const warnEmbed = new EmbedBuilder()
+            .setColor(0xFFFF00)
+            .setDescription(`⚠️ ${message.author}, merci de rester poli.`);
+        await message.channel.send({ embeds: [warnEmbed] }).then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+        return; 
     }
 
-    // 2. Ping @everyone / @here
+    // 3. Ping global (-30 pts)
     if (message.mentions.everyone) {
         scoreChange -= 30;
-        reasons.push('Ping global');
-    }
-
-    // 3. Envoi de lien (si score < 50)
-    const linkRegex = /(https?:\/\/[^\s]+)/g;
-    if (linkRegex.test(content)) {
-        const data = await getTrustData(message.author.id);
-        if (data.trust_score < 50) {
-            scoreChange -= 10;
-            reasons.push('Lien (Score < 50)');
-        }
+        reason = reason ? reason + ' + Ping Global' : 'Ping Global';
     }
 
     if (scoreChange !== 0) {
-        await updateTrustScore(message.author.id, scoreChange, reasons.join(', '));
+        await updateTrustScore(message.guild, message.author.id, scoreChange, reason);
     }
 
     // Bonus de fidélité / constructif
     await handleConstructiveBonus(message);
+    await checkSeniorityBonus(message.guild, message.author.id);
+}
+
+/**
+ * Bonus d'ancienneté (+5/semaine)
+ */
+async function checkSeniorityBonus(guild, userId) {
+    const data = await getTrustData(userId);
+    const now = Date.now();
+    
+    // Si on n'a jamais donné de bonus, on initialise à la date de join
+    if (!data.last_bonus_date) {
+        await pool.query('UPDATE user_trust SET last_bonus_date = join_date WHERE user_id = $1', [userId]);
+        data.last_bonus_date = data.join_date;
+    }
+
+    const lastBonus = new Date(data.last_bonus_date).getTime();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+
+    if (now - lastBonus >= weekMs) {
+        const weeks = Math.floor((now - lastBonus) / weekMs);
+        await updateTrustScore(guild, userId, 5 * weeks, `${weeks} semaine(s) d'ancienneté`);
+        await pool.query('UPDATE user_trust SET last_bonus_date = CURRENT_TIMESTAMP WHERE user_id = $1', [userId]);
+        data.last_bonus_date = new Date();
+    }
 }
 
 /**
@@ -163,39 +265,20 @@ async function handleConstructiveBonus(message) {
     
     // Protection score farming
     if (message.content.length < 5) return;
-    if (data.last_content === message.content) return; // Même message que le précédent
+    if (data.last_content === message.content) return;
 
-    // Incrémenter messages et bonus
     try {
         await pool.query('UPDATE user_trust SET total_messages = total_messages + 1, last_content = $1 WHERE user_id = $2', [message.content, message.author.id]);
         data.total_messages += 1;
         data.last_content = message.content;
 
-        // Tranche de 100 messages constructifs: +2 pts (Max 10/semaine)
         if (data.total_messages % 100 === 0 && (data.weekly_constructive_count || 0) < 5) {
-            await updateTrustScore(message.author.id, 2, '100 messages constructifs');
+            await updateTrustScore(message.guild, message.author.id, 2, '100 messages constructifs');
             await pool.query('UPDATE user_trust SET weekly_constructive_count = weekly_constructive_count + 1 WHERE user_id = $2', [message.author.id]);
         }
     } catch (err) {
         console.error('[TrustHelper] Erreur constructive:', err);
     }
-}
-
-/**
- * Bonus de fidélité hebdomadaire (Cron ou lors de l'activité)
- */
-async function applyWeeklyFidelity(guild) {
-    // Cette fonction serait appelée par un cron job
-    try {
-        const res = await pool.query('SELECT user_id, join_date FROM user_trust');
-        for (const row of res.rows) {
-            const weeks = Math.floor((Date.now() - new Date(row.join_date)) / (7 * 24 * 60 * 60 * 1000));
-            if (weeks > 0) {
-                // On pourrait stocker la dernière date de bonus fidelity pour ne donner qu'une fois par semaine
-                // Pour simplifier cette version, on laisse la logique métier ici.
-            }
-        }
-    } catch (err) {}
 }
 
 module.exports = {
@@ -204,6 +287,7 @@ module.exports = {
     setShadowMute,
     handleNewMemberTrust,
     checkComportementalMalus,
-    applyWeeklyFidelity,
+    applySoumis,
+    trustCache,
     SCORE_THRESHOLDS
 };

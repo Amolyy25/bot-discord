@@ -1,149 +1,67 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { saveUserRoles } = require('./utils/soumisHelper');
-const { addSanction } = require('./utils/sanctionsHelper');
+const trust = require('./utils/trustHelper');
+const { checkPermission, isModChannel, isAdmin, getStaffLevel } = require('./utils/permHelper');
+const { requestDoubleValidation } = require('./utils/validationHelper');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('soumis')
-        .setDescription('Soumet un utilisateur en lui enlevant ses rôles')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-        .addUserOption(option =>
-            option.setName('utilisateur')
-                .setDescription('L\'utilisateur à soumettre')
-                .setRequired(true)),
+        .setDescription('Neutralise un membre (Timeout 24h + Retrait rôles)')
+        .addUserOption(option => option.setName('cible').setDescription('Le membre à soumettre').setRequired(true))
+        .addIntegerOption(option => option.setName('duree').setDescription('Durée en heures (Défaut 24h)')),
 
     async execute(interaction) {
-        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
+        const hasPerm = checkPermission(interaction.member, 'soumis');
+        if (!hasPerm) return interaction.reply({ content: '❌ Vous n\'avez pas la permission.', flags: 64 });
+
+        const target = interaction.options.getMember('cible');
+        const duration = interaction.options.getInteger('duree') || 24;
+
+        if (!target) return interaction.reply({ content: 'Membre introuvable.', flags: 64 });
         
-        // Vérification de permission
-        if (!checkPermission(interaction.member, 'soumis')) {
-            return interaction.reply({ content: 'non ta pas la perm', flags: 64 });
+        // Empêcher de se soumettre soi-même ou qqun de plus haut
+        if (target.id === interaction.user.id) return interaction.reply({ content: '❌ Impossible.', flags: 64 });
+        if (target.roles.highest.position >= interaction.member.roles.highest.position && !isAdmin(interaction.member)) {
+            return interaction.reply({ content: '❌ Hiérarchie insuffisante.', flags: 64 });
         }
 
-        const adminStatus = isAdmin(interaction.member);
-        const isGeneral = interaction.channel.name.toLowerCase().includes('general');
-        if (!isModChannel(interaction.channelId) && !isGeneral && !adminStatus) {
-            return interaction.reply({ content: '❌ Vous ne pouvez pas utiliser cette commande dans ce salon.', flags: 64 });
-        }
-        const target = interaction.options.getUser('utilisateur');
-        const member = await interaction.guild.members.fetch(target.id).catch(() => null);
-
-        if (!member) return interaction.reply({ content: 'Utilisateur non trouvé!', flags: 64 });
-        if (member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({ content: 'Vous ne pouvez pas soumettre quelqu\'un avec un rôle égal ou supérieur!', flags: 64 });
-        }
-
-        let role = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'soumis');
-        if (!role) {
-            try {
-                role = await interaction.guild.roles.create({
-                    name: 'soumis',
-                    color: '#010101',
-                    permissions: 0n, // Aucune permission
-                    reason: 'Rôle pour la commande soumis'
-                });
-            } catch (error) {
-                return interaction.reply({ content: 'Je ne peux pas créer le rôle "soumis"!', flags: 64 });
+        const executeAction = async () => {
+            await trust.applySoumis(target, duration, `Manuel par ${interaction.user.tag}`);
+            // Pas de reply ici s'il est déjà fait par la validation, ou alors interaction.followUp
+            if (!interaction.replied) {
+                await interaction.reply({ content: `✅ ${target} a été soumis pour ${duration}h.` });
             }
+        };
+
+        // Double validation si la cible est un staff (Niveaux Perm I+)
+        const targetStaffLevel = getStaffLevel(target);
+        if (targetStaffLevel > 0) {
+            return requestDoubleValidation(interaction, 'Soumission Staff', target.user.tag, executeAction);
         }
 
-        try {
-            // Sauvegarder les rôles actuels (filtre les rôles gérés et @everyone)
-            const removableRoles = member.roles.cache.filter(r => r.name !== '@everyone' && !r.managed);
-            const roleIds = removableRoles.map(r => r.id);
-            
-            if (roleIds.length > 0) {
-                saveUserRoles(interaction.guild.id, target.id, roleIds);
-                // Enlever tous les rôles
-                await member.roles.remove(removableRoles);
-            }
-
-            // Ajouter le rôle soumis
-            await member.roles.add(role);
-            
-            // Enregistrer la sanction
-            await addSanction(interaction.guild.id, target.id, 'soumis', '1', interaction.user.tag, 'Utilisation de la commande soumis', 'Soumis', 'Soumission');
-
-            const { logModAction } = require('./utils/logHelper');
-            await logModAction(interaction.guild, {
-                action: 'SOUMIS',
-                moderator: interaction.user,
-                target: target,
-                color: 0x010101
-            });
-            
-            await interaction.reply({ content: `${target} a été soumis par **${interaction.user.tag}** !` });
-            await require('./utils/permHelper').checkAndConsumeRole(interaction.member, 'soumis');
-        } catch (error) {
-            console.error(error);
-            await interaction.reply({ content: 'Erreur lors de la soumission!', flags: 64 });
-        }
+        await executeAction();
     },
 
     async executeMessage(message, args) {
-        const { checkPermission, isModChannel, isAdmin } = require('./utils/permHelper');
-        
-        // Vérification de permission
-        if (!checkPermission(message.member, 'soumis')) {
-            return message.reply('non ta pas la perm');
+        if (!checkPermission(message.member, 'soumis')) return;
+
+        const target = message.mentions.members.first() || await message.guild.members.fetch(args[0]).catch(() => null);
+        if (!target) return message.reply('❌ Usage: `-soumis @membre`');
+
+        if (target.roles.highest.position >= message.member.roles.highest.position && !isAdmin(message.member)) {
+            return message.reply('❌ Hiérarchie insuffisante.');
         }
 
-        const adminStatus = isAdmin(message.member);
-        const isGeneral = message.channel.name.toLowerCase().includes('general');
-        if (!isModChannel(message.channel.id) && !isGeneral && !adminStatus) {
-            return message.reply('❌ Vous ne pouvez pas utiliser cette commande dans ce salon.');
+        const executeAction = async () => {
+            await trust.applySoumis(target, 24, `Manuel (Message) par ${message.author.tag}`);
+            await message.channel.send(`✅ ${target} a été soumis.`);
+        };
+
+        if (getStaffLevel(target) > 0) {
+            const { requestDoubleValidationMsg } = require('./utils/validationHelper');
+            return requestDoubleValidationMsg(message, 'Soumission Staff', target.user.tag, executeAction);
         }
 
-        const target = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
-        if (!target) return message.reply('Usage: -soumis @utilisateur ou ID');
-
-        const member = await message.guild.members.fetch(target.id).catch(() => null);
-        if (!member) return message.reply('Utilisateur non trouvé!');
-        if (member.roles.highest.position >= message.member.roles.highest.position) {
-            return message.reply('Vous ne pouvez pas soumettre quelqu\'un avec un rôle égal ou supérieur!');
-        }
-
-        let role = message.guild.roles.cache.find(r => r.name.toLowerCase() === 'soumis');
-        if (!role) {
-            try {
-                role = await message.guild.roles.create({
-                    name: 'soumis',
-                    color: '#010101',
-                    permissions: 0n,
-                    reason: 'Rôle pour la commande soumis'
-                });
-            } catch (error) {
-                return message.reply('Je ne peux pas créer le rôle "soumis"!');
-            }
-        }
-
-        try {
-            const removableRoles = member.roles.cache.filter(r => r.name !== '@everyone' && !r.managed);
-            const roleIds = removableRoles.map(r => r.id);
-            
-            if (roleIds.length > 0) {
-                saveUserRoles(message.guild.id, target.id, roleIds);
-                await member.roles.remove(removableRoles);
-            }
-
-            await member.roles.add(role);
-
-            // Enregistrer la sanction
-            await addSanction(message.guild.id, target.id, 'soumis', '1', message.author.tag, 'Utilisation de la commande soumis', 'Soumis', 'Soumission');
-
-            const { logModAction } = require('./utils/logHelper');
-            await logModAction(message.guild, {
-                action: 'SOUMIS',
-                moderator: message.author,
-                target: target,
-                color: 0x010101
-            });
-
-            await message.channel.send({ content: `${target} a été soumis par **${message.author.tag}** !` });
-            await require('./utils/permHelper').checkAndConsumeRole(message.member, 'soumis');
-        } catch (error) {
-            console.error(error);
-            message.reply('Erreur lors de la soumission!');
-        }
+        await executeAction();
     }
 };

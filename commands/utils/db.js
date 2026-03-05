@@ -35,6 +35,7 @@ async function initDB() {
                 last_bonus_date TIMESTAMPTZ,
                 last_content TEXT,
                 filtered_count INTEGER DEFAULT 0,
+                muted_until TIMESTAMPTZ,
                 weekly_constructive_count INTEGER DEFAULT 0
             );
         `);

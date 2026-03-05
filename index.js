@@ -117,6 +117,13 @@ client.on(Events.GuildMemberAdd, async (member) => {
         await trust.handleNewMemberTrust(member);
         await checkCollectiveIntelligence(member);
 
+        // Lana Sentinel - Persistance de neutralisation
+        const trustData = await trust.getTrustData(member.id);
+        if (trustData.muted_until && new Date(trustData.muted_until) > new Date()) {
+            console.log(`[Sentinel] Réadhésion suspecte de ${member.user.tag} (Pénalité active).`);
+            await trust.applySoumis(member, 48, 'Réadhésion durant une neutralisation active (Pénalité augmentée à 48h)');
+        }
+
     } catch (error) {
         console.error('Erreur lors de l\'envoi du message de bienvenue:', error);
     }

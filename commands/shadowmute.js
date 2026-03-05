@@ -27,13 +27,16 @@ module.exports = {
         const hasPerm = await checkPermission(message.member, 'shadowmute');
         if (!hasPerm) return;
 
-        const target = message.mentions.members.first();
-        if (!target) return message.channel.send('❌ Usage: `-shadowmute @membre`');
+        let target = message.mentions.members.first();
+        if (!target && args[0]) {
+            target = await message.guild.members.fetch(args[0]).catch(() => null);
+        }
+        if (!target) return message.channel.send('❌ Usage: `-shadowmute @membre/ID`');
 
         const data = await trust.getTrustData(target.id);
         const newStatus = !data.is_shadow_muted;
 
         await trust.setShadowMute(target.id, newStatus);
-        await message.channel.send(`✅ Le mode Shadow Mute est désormais **${newStatus ? 'ACTIF' : 'INACTIF'}** pour **${target.user.tag}**.`);
+        await message.channel.send(`✅ Le mode Shadow Mute est désormais **${newStatus ? 'ACTIF' : 'INACTIF'}** pour **${target.user?.tag || target.id}**.`);
     }
 };

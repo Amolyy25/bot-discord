@@ -36,7 +36,12 @@ module.exports = {
         const hasPerm = await checkPermission(message.member, 'score');
         if (!hasPerm) return;
 
-        const target = message.mentions.members.first() || message.member;
+        let target = message.mentions.members.first();
+        if (!target && args[0]) {
+            target = await message.guild.members.fetch(args[0]).catch(() => null);
+        }
+        if (!target) target = message.member;
+
         const data = await trust.getTrustData(target.id);
 
         const embed = new EmbedBuilder()

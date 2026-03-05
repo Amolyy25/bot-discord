@@ -35,15 +35,16 @@ module.exports = {
         }
 
         try {
-            // Récupérer les anciens rôles
             const oldRoleIds = getUserRoles(interaction.guild.id, target.id);
-            
-            // Enlever le rôle soumis
-            await member.roles.remove(role);
+            // Libération
+            await member.roles.remove(role).catch(() => {});
+            await member.timeout(null).catch(() => {});
+            const { pool } = require('./utils/db');
+            await pool.query('UPDATE user_trust SET muted_until = NULL WHERE user_id = $1', [target.id]);
 
             // Restaurer les anciens rôles
             if (oldRoleIds && oldRoleIds.length > 0) {
-                await member.roles.add(oldRoleIds);
+                await member.roles.add(oldRoleIds).catch(() => {});
             }
 
             const { logModAction } = require('./utils/logHelper');
@@ -89,10 +90,13 @@ module.exports = {
 
         try {
             const oldRoleIds = getUserRoles(message.guild.id, target.id);
-            await member.roles.remove(role);
+            await member.roles.remove(role).catch(() => {});
+            await member.timeout(null).catch(() => {});
+            const { pool } = require('./utils/db');
+            await pool.query('UPDATE user_trust SET muted_until = NULL WHERE user_id = $1', [target.id]);
 
             if (oldRoleIds && oldRoleIds.length > 0) {
-                await member.roles.add(oldRoleIds);
+                await member.roles.add(oldRoleIds).catch(() => {});
             }
 
             const { logModAction } = require('./utils/logHelper');

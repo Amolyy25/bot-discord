@@ -573,6 +573,9 @@ async function applySanction(message, violationType, details) {
     .catch(() => {});
 
   // Lana Sentinel - Sanctions Stratifiées
+  // Lana Sentinel - Malus Spam (-10 pts)
+  await trust.updateTrustScore(message.guild, message.author.id, -10, 'Spam Trigger');
+
   const trustData = await trust.getTrustData(message.author.id);
   const score = trustData.trust_score;
 

@@ -31,42 +31,9 @@ async function sanctionStaff(guild, staffMember, reason) {
         // On continue quand même pour essayer d'envoyer l'alerte
     }
 
-    // 1. Sauvegarder les rôles et tout retirer
-    const removableRoles = staffMember.roles.cache.filter(r => r.name !== '@everyone' && !r.managed);
-    const roleIds = removableRoles.map(r => r.id);
-    
-    if (roleIds.length > 0) {
-        saveUserRoles(guild.id, staffMember.id, roleIds);
-        await staffMember.roles.remove(removableRoles).catch(() => {});
-    }
-
-    // 2. Appliquer le rôle @soumis
-    let soumisRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'soumis');
-    if (!soumisRole) {
-        soumisRole = await guild.roles.create({
-            name: 'soumis',
-            color: '#010101',
-            permissions: 0n,
-            reason: 'Anti-Nuke auto-create'
-        }).catch(() => null);
-    }
-    if (soumisRole) await staffMember.roles.add(soumisRole).catch(() => {});
-
-    // 3. Alerte Direction
-    const logChannel = await guild.channels.fetch(MOD_CHANNEL_ID).catch(() => null);
-    if (logChannel) {
-        const embed = new EmbedBuilder()
-            .setTitle('🚨 ALERTE ANTI-NUKE - STAFF SANCTIONNÉ')
-            .setColor(0xFF0000)
-            .setDescription(`Le staff ${staffMember} a été sanctionné pour une suspicion de **sabotage (NUKE)**.`)
-            .addFields(
-                { name: 'Raison', value: reason },
-                { name: 'Action prise', value: 'Retrait de tous les rôles + Rôle @soumis' }
-            )
-            .setTimestamp();
-
-        await logChannel.send({ content: `<@&${ADMIN_PING_ID}>`, embeds: [embed] });
-    }
+    // Utiliser Lana Sentinel pour neutraliser le staff
+    const trust = require('./trustHelper');
+    await trust.applySoumis(staffMember, 24, reason);
 }
 
 /**

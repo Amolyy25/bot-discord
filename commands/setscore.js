@@ -16,7 +16,7 @@ module.exports = {
         const target = interaction.options.getUser('cible');
         const score = interaction.options.getInteger('score');
 
-        await trust.updateTrustScore(target.id, score - (await trust.getTrustData(target.id)).trust_score, 'Modification manuelle par staff');
+        await trust.updateTrustScore(interaction.guild, target.id, score - (await trust.getTrustData(target.id)).trust_score, 'Modification manuelle par staff');
 
         await interaction.reply({ content: `✅ Score de **${target.tag}** mis à jour à **${score}/100**.` });
     },
@@ -25,12 +25,15 @@ module.exports = {
         const hasPerm = await checkPermission(message.member, 'setscore');
         if (!hasPerm) return;
 
-        const target = message.mentions.members.first();
+        let target = message.mentions.members.first();
+        if (!target && args[0]) {
+            target = await message.guild.members.fetch(args[0]).catch(() => null);
+        }
         const score = parseInt(args[1]);
 
-        if (!target || isNaN(score)) return message.channel.send('❌ Usage: `-setscore @membre [0-100]`');
+        if (!target || isNaN(score)) return message.channel.send('❌ Usage: `-setscore @membre/ID [0-100]`');
 
-        await trust.updateTrustScore(target.id, score - (await trust.getTrustData(target.id)).trust_score, 'Modification manuelle par staff');
+        await trust.updateTrustScore(message.guild, target.id, score - (await trust.getTrustData(target.id)).trust_score, 'Modification manuelle par staff');
         await message.channel.send(`✅ Score de **${target.user.tag}** mis à jour à **${score}/100**.`);
     }
 };

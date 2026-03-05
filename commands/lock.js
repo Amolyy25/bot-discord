@@ -1,11 +1,11 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { checkPermission } = require('./utils/permHelper');
+const { checkPermission, isAdmin, ROLES } = require('./utils/permHelper');
+const { requestDoubleValidation } = require('./utils/validationHelper');
 
 const LOCKS_FILE = path.join(__dirname, '../channelLocks.json');
 
-// Fonction pour charger les locks
 function loadLocks() {
     try {
         if (!fs.existsSync(LOCKS_FILE)) {
@@ -20,7 +20,6 @@ function loadLocks() {
     }
 }
 
-// Fonction pour sauvegarder les locks
 function saveLocks(locks) {
     try {
         fs.writeFileSync(LOCKS_FILE, JSON.stringify(locks, null, 4));
@@ -32,88 +31,106 @@ function saveLocks(locks) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('lock')
-        .setDescription('Verrouille le salon actuel (plus personne ne peut parler)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+        .setDescription('Verrouille un salon ou le serveur entier')
+        .setDafaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .addStringOption(option => 
+            option.setName('option')
+                .setDescription('Type de verrouillage')
+                .addChoices(
+                    { name: 'Salon actuel', value: 'local' },
+                    { name: 'Serveur entier (Global)', value: 'global' }
+                )),
 
     async execute(interaction) {
-        if (!interaction.guild) {
-            return interaction.reply({ content: '❌ Cette commande ne peut être utilisée que sur un serveur.', flags: 64 });
+        if (!checkPermission(interaction.member, 'lock')) {
+            return interaction.reply({ content: '❌ Permission insuffisante.', flags: 64 });
         }
 
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) && !checkPermission(interaction.member, 'lock')) {
-            return interaction.reply({ content: '❌ Vous n\'avez pas la permission de verrouiller ce salon.', flags: 64 });
-        }
-
-        const channel = interaction.channel;
+        const option = interaction.options.getString('option') || 'local';
         const locks = loadLocks();
 
-        if (locks[channel.id]) {
-            return interaction.reply({ content: '⚠️ Ce salon est déjà verrouillé.', flags: 64 });
+        const lockAction = async () => {
+            if (option === 'global') {
+                const channels = interaction.guild.channels.cache.filter(c => c.isTextBased());
+                for (const [id, channel] of channels) {
+                    if (locks[id]) continue;
+                    const overwrites = channel.permissionOverwrites.cache.map(o => ({
+                        id: o.id,
+                        type: o.type,
+                        allow: o.allow.bitfield.toString(),
+                        deny: o.deny.bitfield.toString()
+                    }));
+                    locks[id] = overwrites;
+                    await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false }).catch(() => {});
+                }
+                saveLocks(locks);
+                await interaction.channel.send('🔒 **Lock Global activé.** Tous les salons textuels sont verrouillés.');
+            } else {
+                const channel = interaction.channel;
+                if (locks[channel.id]) return interaction.reply({ content: 'Déjà verrouillé.', flags: 64 });
+
+                const overwrites = channel.permissionOverwrites.cache.map(o => ({
+                    id: o.id,
+                    type: o.type,
+                    allow: o.allow.bitfield.toString(),
+                    deny: o.deny.bitfield.toString()
+                }));
+                locks[channel.id] = overwrites;
+                saveLocks(locks);
+                await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false });
+                await interaction.reply('🔒 Salon verrouillé.');
+            }
+        };
+
+        if (option === 'global') {
+            return requestDoubleValidation(interaction, 'Lock Global', 'Serveur Entier', lockAction);
         }
 
-        // Sauvegarder les permissions actuelles
-        const overwrites = channel.permissionOverwrites.cache.map(overwrite => ({
-            id: overwrite.id,
-            type: overwrite.type,
-            allow: overwrite.allow.bitfield.toString(),
-            deny: overwrite.deny.bitfield.toString()
-        }));
-
-        locks[channel.id] = overwrites;
-        saveLocks(locks);
-
-        try {
-            // Appliquer le verrouillage : Deny SendMessages pour @everyone
-            await channel.permissionOverwrites.edit(channel.guild.roles.everyone, {
-                SendMessages: false
-            });
-
-            await interaction.reply('🔒 **Salon verrouillé.** Les permissions ont été sauvegardées.');
-        } catch (error) {
-            console.error(error);
-            // En cas d'erreur, on annule la sauvegarde
-            delete locks[channel.id];
-            saveLocks(locks);
-            await interaction.reply({ content: '❌ Erreur lors du verrouillage du salon.', flags: 64 });
-        }
+        await lockAction();
     },
 
     async executeMessage(message, args) {
-        if (!message.guild) {
-            return message.reply('❌ Cette commande ne peut être utilisée que sur un serveur.');
-        }
+        if (!checkPermission(message.member, 'lock')) return;
 
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels) && !checkPermission(message.member, 'lock')) {
-            return message.reply('❌ Vous n\'avez pas la permission de verrouiller ce salon.');
-        }
-
-        const channel = message.channel;
+        const isGlobal = args[0]?.toLowerCase() === 'global';
         const locks = loadLocks();
 
-        if (locks[channel.id]) {
-            return message.reply('⚠️ Ce salon est déjà verrouillé.');
+        const lockAction = async () => {
+            if (isGlobal) {
+                const channels = message.guild.channels.cache.filter(c => c.isTextBased());
+                for (const [id, channel] of channels) {
+                    if (locks[id]) continue;
+                    const overwrites = channel.permissionOverwrites.cache.map(o => ({
+                        id: o.id,
+                        type: o.type,
+                        allow: o.allow.bitfield.toString(),
+                        deny: o.deny.bitfield.toString()
+                    }));
+                    locks[id] = overwrites;
+                    await channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: false }).catch(() => {});
+                }
+                saveLocks(locks);
+                await message.channel.send('🔒 **Lock Global activé.**');
+            } else {
+                if (locks[message.channel.id]) return message.reply('Déjà verrouillé.');
+                const overwrites = message.channel.permissionOverwrites.cache.map(o => ({
+                    id: o.id,
+                    type: o.type,
+                    allow: o.allow.bitfield.toString(),
+                    deny: o.deny.bitfield.toString()
+                }));
+                locks[message.channel.id] = overwrites;
+                saveLocks(locks);
+                await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: false });
+                await message.reply('🔒 Salon verrouillé.');
+            }
+        };
+
+        if (isGlobal) {
+            const { requestDoubleValidationMsg } = require('./utils/validationHelper');
+            return requestDoubleValidationMsg(message, 'Lock Global', 'Serveur Entier', lockAction);
         }
 
-        const overwrites = channel.permissionOverwrites.cache.map(overwrite => ({
-            id: overwrite.id,
-            type: overwrite.type,
-            allow: overwrite.allow.bitfield.toString(),
-            deny: overwrite.deny.bitfield.toString()
-        }));
-
-        locks[channel.id] = overwrites;
-        saveLocks(locks);
-
-        try {
-            await channel.permissionOverwrites.edit(message.guild.roles.everyone, {
-                SendMessages: false
-            });
-            await message.reply('🔒 **Salon verrouillé.** Les permissions ont été sauvegardées.');
-        } catch (error) {
-            console.error(error);
-            delete locks[channel.id];
-            saveLocks(locks);
-            message.reply('❌ Erreur lors du verrouillage du salon.');
-        }
+        await lockAction();
     }
 };
