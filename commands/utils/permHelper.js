@@ -230,7 +230,7 @@ const ROLES = {
 };
 
 const MOD_CHANNEL_ID = '1469258215916175392';
-const ADMIN_PING_ID = '1172869002670903422';
+const ADMIN_PING_ID = '1475891404566954128';
 
 // Mapping des commandes par niveau de permission
 const COMMAND_PERMS = {
