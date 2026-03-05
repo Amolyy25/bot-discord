@@ -255,6 +255,7 @@ const COMMAND_PERMS = {
     'fake': ROLES.PERM_3,
     'vmoveall': ROLES.PERM_3,
     'vgather': ROLES.PERM_3,
+    'score': ROLES.PERM_3,
 
     // Perm IV
     'mute': ROLES.PERM_4,
@@ -267,6 +268,8 @@ const COMMAND_PERMS = {
     'vclear': ROLES.PERM_5,
     'soumis': ROLES.PERM_5,
     'bl': ROLES.PERM_5,
+    'setscore': ROLES.PERM_5,
+    'shadowmute': ROLES.PERM_5,
     'unsoumis': ROLES.PERM_5,
 
     // Spécial

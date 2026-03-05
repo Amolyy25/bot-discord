@@ -26,8 +26,19 @@ async function initDB() {
                 timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 expires_at TIMESTAMPTZ
             );
+            CREATE TABLE IF NOT EXISTS user_trust (
+                user_id TEXT PRIMARY KEY,
+                trust_score INTEGER DEFAULT 30,
+                total_messages INTEGER DEFAULT 0,
+                join_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                is_shadow_muted BOOLEAN DEFAULT FALSE,
+                last_bonus_date TIMESTAMPTZ,
+                last_content TEXT,
+                filtered_count INTEGER DEFAULT 0,
+                weekly_constructive_count INTEGER DEFAULT 0
+            );
         `);
-        console.log('[DB] Table sanctions vérifiée/créée.');
+        console.log('[DB] Tables sanctions et user_trust vérifiées/créées.');
     } catch (err) {
         console.error('[DB] Erreur lors de l\'initialisation:', err);
     } finally {

@@ -1,2 +1,6 @@
 node_modules/
 .env
+.cache
+*.md
+.DS_Store
+.gitignore

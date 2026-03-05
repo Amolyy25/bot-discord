@@ -2,6 +2,9 @@ const { EmbedBuilder } = require("discord.js");
 const { addSanction, parseDuration } = require("./sanctionsHelper");
 const { saveUserRoles } = require("./soumisHelper");
 const { logModAction } = require("./logHelper");
+const { pool } = require("./db");
+const trust = require("./trustHelper");
+const { PermissionFlagsBits } = require("discord.js");
 
 // ═══════════════════════════════════════════════════════
 // CONFIGURATION
@@ -350,15 +353,24 @@ function trackMessage(userId, content, channelId) {
   );
 
   // === CHECK 1 : Spam de messages (trop rapide) ===
+  const score = arguments[3] ?? 50;
+  let msgLimit = CONFIG.MESSAGE_LIMIT;
+  if (score < 20) msgLimit = 3;
+  else if (score < 50) msgLimit = 5;
+  else if (score < 80) msgLimit = 7;
+  else msgLimit = 12;
+
   const recentMessages = userData.messages.filter(
     (m) => now - m.timestamp < CONFIG.TIME_WINDOW,
   );
-  if (recentMessages.length > CONFIG.MESSAGE_LIMIT) {
-    return {
-      violation: true,
-      type: "spam",
-      details: `${recentMessages.length} messages en ${CONFIG.TIME_WINDOW / 1000}s`,
-    };
+  if (recentMessages.length > msgLimit) {
+    if (score < 80) { // Les vétérans 80+ ignorent le spam (sauf mentions massives gérées ailleurs)
+        return {
+          violation: true,
+          type: "spam",
+          details: `${recentMessages.length} messages en ${CONFIG.TIME_WINDOW / 1000}s (Seuil Trust: ${msgLimit})`,
+        };
+    }
   }
 
   // === CHECK 2 : Messages dupliqués ===
@@ -560,20 +572,35 @@ async function applySanction(message, violationType, details) {
     .send(`${message.author} moin vite, détend toi`)
     .catch(() => {});
 
-  // Détermination de la sanction
+  // Lana Sentinel - Sanctions Stratifiées
+  const trustData = await trust.getTrustData(message.author.id);
+  const score = trustData.trust_score;
+
   let sanctionType = 'warn';
   let sanctionLevel = '1';
-  let durationStr = 'instantané';
   let gravityLabel = `Détection de spam (${userData.spamOccurrence}e fois)`;
+  let durationStr = 'instantané';
 
-  if (userData.spamOccurrence === 2) {
-    sanctionType = 'tempmute';
-    sanctionLevel = '1';
-    durationStr = '5m';
-  } else if (userData.spamOccurrence > 2) {
-    sanctionType = 'tempmute';
-    sanctionLevel = '3';
-    durationStr = '20m';
+  if (score < 20) { // Hostile
+      await trust.setShadowMute(message.author.id, true);
+      trustData.filtered_count = (trustData.filtered_count || 0) + 1;
+      await pool.query('UPDATE user_trust SET filtered_count = $1 WHERE user_id = $2', [trustData.filtered_count, message.author.id]);
+      
+      if (trustData.filtered_count >= 10) {
+          await message.member.ban({ reason: '[Sentinelle] Ban auto (Hostile + 10 messages filtrés)' }).catch(() => {});
+      }
+      return; // Shadow mute gère le reste
+  } else if (score < 50) { // Suspect
+      sanctionType = 'tempmute';
+      sanctionLevel = 'Pénalité Suspect';
+      durationStr = '1h';
+  } else if (score < 80) { // Neutre
+      sanctionType = 'warn';
+      durationStr = 'DM Warning';
+  } else {
+      // Vétéran : normallement ignoré par handleMessage, mais si on arrive ici (ex: mentions)
+      sanctionType = 'warn';
+      durationStr = 'Vétéran Warning';
   }
 
   // Toujours enregistrer dans les sanctions.json
@@ -584,9 +611,9 @@ async function applySanction(message, violationType, details) {
       message.author.id,
       sanctionType,
       sanctionLevel,
-      "[AntiSpam]",
+      "[Sentinelle]",
       null,
-      'Spam',
+      'Violation Trust',
       gravityLabel,
       durationStr
     );
@@ -1045,6 +1072,7 @@ async function handleMessage(message) {
     message.author.id,
     message.content,
     message.channel.id,
+    trustData.trust_score // Injection du score
   );
   if (result.violation) {
     await applySanction(message, result.type, result.details);

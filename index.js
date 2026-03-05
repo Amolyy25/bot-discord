@@ -8,6 +8,7 @@ const statsCommand = require('./commands/stats.js');
 const antispam = require('./commands/utils/antispamHelper');
 const jackpot = require('./commands/utils/jackpotHelper');
 const antinuke = require('./commands/utils/antiNukeHelper');
+const trust = require('./commands/utils/trustHelper');
 const { initDB } = require('./commands/utils/db');
 const { migrateSanctions } = require('./commands/utils/sanctionsHelper');
 const { ROLES } = require('./commands/utils/permHelper');
@@ -112,10 +113,68 @@ client.on(Events.GuildMemberAdd, async (member) => {
             fs.writeFileSync(pendingRewardsFile, JSON.stringify(pendingRewards, null, 2));
         }
 
+        // Lana Sentinel - Malus d'entrée + Intelligence Collective
+        await trust.handleNewMemberTrust(member);
+        await checkCollectiveIntelligence(member);
+
     } catch (error) {
         console.error('Erreur lors de l\'envoi du message de bienvenue:', error);
     }
 });
+
+// Lana Sentinel - Intelligence Collective & Quarantaine
+let recentJoins = [];
+let quarantineMode = false;
+
+async function checkCollectiveIntelligence(member) {
+    const now = Date.now();
+    recentJoins.push({ timestamp: now, id: member.id });
+    
+    // Garder seulement les 5 derniers arrivants dans les 3 dernières minutes
+    recentJoins = recentJoins.filter(j => now - j.timestamp < 3 * 60 * 1000);
+    
+    if (recentJoins.length >= 5) {
+        let totalScore = 0;
+        for (const join of recentJoins) {
+            const data = await trust.getTrustData(join.id);
+            totalScore += data.trust_score;
+        }
+        
+        const avgScore = totalScore / recentJoins.length;
+        if (avgScore < 30) {
+            console.log(`[Sentinelle] 🚨 ALERTE QUARANTAINE - Score moyen: ${avgScore}`);
+            quarantineMode = true;
+            
+            // Appliquer le rôle @soumis aux arrivants foireux
+            const newcomers = await member.guild.members.fetch();
+            for (const join of recentJoins) {
+                const target = newcomers.get(join.id);
+                const data = await trust.getTrustData(join.id);
+                if (target && data.trust_score < 40) {
+                    const { sanctionStaff } = require('./commands/utils/antiNukeHelper');
+                    await sanctionStaff(member.guild, target, 'Quarantaine (Score Individuel < 40)');
+                }
+            }
+
+            // Alerte Direction
+            const logChannel = await member.guild.channels.fetch('1469258215916175392').catch(() => null);
+            if (logChannel) {
+                const { ADMIN_PING_ID } = require('./commands/utils/permHelper');
+                const embed = new EmbedBuilder()
+                    .setTitle('🚨 ALERTE SÉCURITÉ - QUARANTAINE ACTIVÉE')
+                    .setColor(0xFF0000)
+                    .setDescription(`Une vague suspecte de **${recentJoins.length} arrivants** a été détectée en moins de 3 minutes.\nScore de confiance moyen: **${Math.round(avgScore)}/100**`)
+                    .setFooter({ text: 'Lana Sentinel Intelligence' })
+                    .setTimestamp();
+
+                await logChannel.send({ content: `<@&${ADMIN_PING_ID || '1172869002670903422'}>`, embeds: [embed] });
+            }
+            
+            // Fin de quarantaine après 10 minutes
+            setTimeout(() => { quarantineMode = false; }, 10 * 60 * 1000);
+        }
+    }
+}
 
 client.on('messageDelete', async (message) => {
     if (!message.author || message.author.bot || !message.content || message.content.length === 0) return;
@@ -666,7 +725,27 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.on('messageCreate', async message => {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild) return;
+
+    // Lana Sentinel - Shadow Mute
+    const trustData = await trust.getTrustData(message.author.id);
+    if (trustData.is_shadow_muted) {
+        await message.delete().catch(() => {});
+        // Log silencieux
+        const logChannel = message.guild.channels.cache.get('1469258215916175392');
+        if (logChannel) {
+            const embed = new EmbedBuilder()
+                .setColor(0x010101)
+                .setAuthor({ name: `[SHADOW_MUTE] ${message.author.tag}`, iconURL: message.author.displayAvatarURL() })
+                .setDescription(message.content || '*Fichier/Embed*')
+                .setTimestamp();
+            await logChannel.send({ embeds: [embed] });
+        }
+        return;
+    }
+
+    // Lana Sentinel - Malus Comportementaux & Bonus Constructifs
+    await trust.checkComportementalMalus(message);
 
     // ══ Anti-Spam / Anti-Raid ══
     // Vérifie AVANT tout le reste (priorité haute)
