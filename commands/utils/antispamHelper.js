@@ -1069,11 +1069,12 @@ async function handleMessage(message) {
   }
 
   // Track le message et vérifier les violations
+  const currentTrust = await trust.getTrustData(message.author.id);
   const result = trackMessage(
     message.author.id,
     message.content,
     message.channel.id,
-    trustData.trust_score // Injection du score
+    currentTrust.trust_score // Injection du score
   );
   if (result.violation) {
     await applySanction(message, result.type, result.details);
