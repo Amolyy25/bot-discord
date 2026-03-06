@@ -1081,8 +1081,27 @@ client.on('interactionCreate', async interaction => {
 
                 saveCommuData(data);
 
+                // Récupérer la config du salon pour recréer le bouton
+                const channelConfig = COMMU_CHANNELS_CONFIG.find(c => c.key === submission.channelKey);
+                let components = [];
+                if (channelConfig) {
+                    let label = channelConfig.buttonLabel;
+                    if (submission.channelKey === 'vote2profil') label = '👘 Proposer un Vote2Profil';
+                    if (submission.channelKey === 'les_dossiers') label = '🗂️ Balancer un dossier';
+                    if (submission.channelKey === 'confession') label = '🤫 Écrire une confession';
+
+                    const actionButton = new ButtonBuilder()
+                        .setCustomId(channelConfig.buttonCustomId)
+                        .setLabel(label)
+                        .setStyle(channelConfig.buttonStyle);
+                    components.push(new ActionRowBuilder().addComponents(actionButton));
+                }
+
                 // Publication dans le salon cible
-                const sentMsg = await targetChannel.send({ embeds: [publicEmbed] });
+                const sentMsg = await targetChannel.send({ 
+                    embeds: [publicEmbed],
+                    components: components
+                });
 
                 // Pour vote2profil : ajouter les réactions 👍 / 👎
                 if (submission.addReactions) {
