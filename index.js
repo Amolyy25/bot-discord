@@ -744,7 +744,7 @@ client.on('interactionCreate', async interaction => {
     // ─── Bouton : Ouvrir un Modal ──────────────────────────────────────────────
     if (interaction.isButton() && interaction.customId.startsWith('commu_btn_')) {
         const key = interaction.customId.replace('commu_btn_', '');
-        const data = loadCommuData();
+
 
         // ── vote2profil ──────────────────────────────────────────────────────
         if (key === 'vote2profil') {
@@ -842,7 +842,7 @@ client.on('interactionCreate', async interaction => {
     // ─── Modal Submit : Préparer & Envoyer dans le salon de validation ─────────
     if (interaction.isModalSubmit() && interaction.customId.startsWith('commu_modal_')) {
         const key = interaction.customId.replace('commu_modal_', '');
-        const data = loadCommuData();
+
 
         try {
             const validationChannel = await interaction.guild.channels.fetch(COMMU_VALIDATION_CHANNEL).catch(() => null);
@@ -1092,7 +1092,7 @@ client.on('interactionCreate', async interaction => {
 
             } catch (err) {
                 console.error('[Commu] Erreur approbation:', err);
-                saveCommuData(data);
+
                 await interaction.reply({ content: `❌ Erreur lors de la publication : ${err.message}`, flags: 64 });
             }
 
@@ -1155,7 +1155,7 @@ client.on('interactionCreate', async interaction => {
             }
         } catch {}
 
-        saveCommuData(data);
+
 
         // Éditer le message de validation
         const failEmbed = new EmbedBuilder()
