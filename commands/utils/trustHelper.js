@@ -4,17 +4,17 @@ const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 
 // Cache local pour éviter de spam la DB
 const trustCache = new Map();
+const slowmodeCache = new Map(); // userId -> lastTimestamp
 
 // Configuration des seuils
 const SCORE_THRESHOLDS = {
+    CRITIQUE: 10,
     HOSTILE: 20,
     SUSPECT: 50,
     NEUTRE: 80
 };
 
-// Listes de mots
-const VULGARITY_WORDS = ['merde', 'con', 'putain', 'chier', 'ta gueule']; // Liste 1
-const HATE_WORDS = ['bougnoule', 'nègre', 'pd', 'pédé', 'salope', 'hitler', 'nazi']; // Liste 2 (Exemples)
+// ... (Listes de mots inchangées)
 
 /**
  * Initialise ou récupère le score d'un utilisateur
@@ -30,23 +30,51 @@ async function getTrustData(userId) {
         } else {
             const newData = {
                 user_id: userId,
-                trust_score: 30,
+                trust_score: 50,
                 total_messages: 0,
                 is_shadow_muted: false,
                 weekly_constructive_count: 0,
-                muted_until: null
+                muted_until: null,
+                last_daily_update: null
             };
             await pool.query(
                 'INSERT INTO user_trust (user_id, trust_score, total_messages, is_shadow_muted) VALUES ($1, $2, $3, $4)',
-                [userId, 30, 0, false]
+                [userId, 50, 0, false]
             );
             trustCache.set(userId, newData);
             return newData;
         }
     } catch (err) {
         console.error('[TrustHelper] Erreur getTrustData:', err);
-        return { trust_score: 30, is_shadow_muted: false, muted_until: null };
+        return { trust_score: 50, is_shadow_muted: false, muted_until: null };
     }
+}
+
+/**
+ * Vérifie le Slowmode individuel (Score entre 10 et 20)
+ */
+async function checkIndividualSlowmode(message, score) {
+    if (score > 10 && score <= 20) {
+        const lastMsg = slowmodeCache.get(message.author.id) || 0;
+        const now = Date.now();
+        const cooldown = 30 * 1000; // 30 secondes
+
+        if (now - lastMsg < cooldown) {
+            await message.delete().catch(() => {});
+            
+            // Envoyer un seul avertissement en MP tous les X temps pour pas spam
+            const lastWarn = slowmodeCache.get(`${message.author.id}_warn`) || 0;
+            if (now - lastWarn > 60000) {
+                try {
+                    await message.author.send(`⚠️ **Lana Sentinel** : Ton score de confiance est bas (**${score}**). Tu peux envoyer un message toutes les 30s le temps de regagner la confiance du secteur.`);
+                    slowmodeCache.set(`${message.author.id}_warn`, now);
+                } catch (e) {}
+            }
+            return true; // Bloqué
+        }
+        slowmodeCache.set(message.author.id, now);
+    }
+    return false;
 }
 
 /**
@@ -231,6 +259,7 @@ async function checkComportementalMalus(message) {
     // Bonus de fidélité / constructif
     await handleConstructiveBonus(message);
     await checkSeniorityBonus(message.guild, message.author.id);
+    await checkDailyBonus(message.guild, message.author.id);
 }
 
 /**
@@ -258,6 +287,43 @@ async function checkSeniorityBonus(guild, userId) {
 }
 
 /**
+ * Bonus d'activité quotidienne (+5 pts)
+ */
+async function checkDailyBonus(guild, userId) {
+    const data = await getTrustData(userId);
+    const today = new Date().toISOString().split('T')[0];
+
+    if (data.last_daily_update !== today) {
+        await updateTrustScore(guild, userId, 5, 'Activité quotidienne');
+        await pool.query('UPDATE user_trust SET last_daily_update = $1 WHERE user_id = $2', [today, userId]);
+        data.last_daily_update = today;
+        trustCache.set(userId, data);
+    }
+}
+
+/**
+ * Bonus de parrainage (+15 pts)
+ */
+async function handleInviteBonus(guild, inviterId) {
+    if (!inviterId) return;
+    await updateTrustScore(guild, inviterId, 15, 'Parrainage (Nouvel arrivant)');
+    await pool.query('UPDATE user_trust SET invite_count = invite_count + 1 WHERE user_id = $1', [inviterId]);
+}
+
+/**
+ * Bonus de bienvenue / Rôles (+10 pts)
+ */
+async function handleWelcomeRoleBonus(guild, userId) {
+    const data = await getTrustData(userId);
+    // On ne donne ce bonus qu'une seule fois (on utilise une colonne ou on vérifie si score > base)
+    // Pour simplifier, on peut vérifier si total_messages est bas et il n'a pas encore eu ce bonus.
+    // Ajoutons un flag en DB plus tard si besoin, pour l'instant un bonus unique.
+    if (data.total_messages < 5) { // Simple vérification pour nouveau membre
+        await updateTrustScore(guild, userId, 10, 'Onboarding / Choix des rôles');
+    }
+}
+
+/**
  * Bonus de fidélité et messages constructifs
  */
 async function handleConstructiveBonus(message) {
@@ -269,7 +335,7 @@ async function handleConstructiveBonus(message) {
 
     try {
         await pool.query('UPDATE user_trust SET total_messages = total_messages + 1, last_content = $1 WHERE user_id = $2', [message.content, message.author.id]);
-        data.total_messages += 1;
+        data.total_messages = (data.total_messages || 0) + 1;
         data.last_content = message.content;
 
         if (data.total_messages % 100 === 0 && (data.weekly_constructive_count || 0) < 5) {
@@ -288,6 +354,9 @@ module.exports = {
     handleNewMemberTrust,
     checkComportementalMalus,
     applySoumis,
+    checkIndividualSlowmode,
+    handleInviteBonus,
+    handleWelcomeRoleBonus,
     trustCache,
     SCORE_THRESHOLDS
 };

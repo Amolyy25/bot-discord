@@ -32,7 +32,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('lock')
         .setDescription('Verrouille un salon ou le serveur entier')
-        .setDafaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
         .addStringOption(option => 
             option.setName('option')
                 .setDescription('Type de verrouillage')

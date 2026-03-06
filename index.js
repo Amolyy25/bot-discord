@@ -55,6 +55,9 @@ const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
+// Lana Sentinel - Invite Tracking Cache
+const guildInvites = new Map();
+
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
@@ -116,6 +119,23 @@ client.on(Events.GuildMemberAdd, async (member) => {
         // Lana Sentinel - Malus d'entrée + Intelligence Collective
         await trust.handleNewMemberTrust(member);
         await checkCollectiveIntelligence(member);
+
+        // Lana Sentinel - Invite Tracking (Parrainage)
+        try {
+            const newInvites = await member.guild.invites.fetch();
+            const oldInvites = guildInvites.get(member.guild.id);
+            const usedInvite = newInvites.find(i => oldInvites && i.uses > (oldInvites.get(i.code) || 0));
+            
+            if (usedInvite && usedInvite.inviter) {
+                console.log(`[Sentinel] ${member.user.tag} a rejoint via l'invite de ${usedInvite.inviter.tag}`);
+                await trust.handleInviteBonus(member.guild, usedInvite.inviter.id);
+            }
+            
+            // Update cache
+            guildInvites.set(member.guild.id, new Map(newInvites.map(i => [i.code, i.uses])));
+        } catch (e) {
+            console.warn('[Sentinel] Erreur tracking invite join:', e);
+        }
 
         // Lana Sentinel - Persistance de neutralisation
         const trustData = await trust.getTrustData(member.id);
@@ -301,6 +321,11 @@ client.on(Events.GuildRoleDelete, async (role) => {
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     const addedRoles = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
     if (addedRoles.size > 0) {
+        // Lana Sentinel - Bonus Bienvenue / Onboarding (+10 pts)
+        if (oldMember.roles.cache.size <= 1) { // Seuledment @everyone avant
+            await trust.handleWelcomeRoleBonus(newMember.guild, newMember.id);
+        }
+
         console.log(`[AntiNuke-Debug] Événement Role Update pour ${newMember.user.tag} (+${addedRoles.size} rôles)`);
         try {
             const fetchedLogs = await newMember.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberRoleUpdate });
@@ -734,9 +759,14 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
 
-    // Lana Sentinel - Shadow Mute
     const trustData = await trust.getTrustData(message.author.id);
-    if (trustData.is_shadow_muted) {
+    const score = trustData.trust_score;
+
+    // Lana Sentinel - Slowmode Individuel (Score 10-20)
+    if (await trust.checkIndividualSlowmode(message, score)) return;
+
+    // Lana Sentinel - Shadow Mute (Score < 10 ou manuel)
+    if (score < 10 || trustData.is_shadow_muted) {
         await message.delete().catch(() => {});
         // Log silencieux
         const logChannel = message.guild.channels.cache.get('1469258215916175392');
@@ -745,6 +775,7 @@ client.on('messageCreate', async message => {
                 .setColor(0x010101)
                 .setAuthor({ name: `[SHADOW_MUTE] ${message.author.tag}`, iconURL: message.author.displayAvatarURL() })
                 .setDescription(message.content || '*Fichier/Embed*')
+                .setFooter({ text: `Score: ${score}` })
                 .setTimestamp();
             await logChannel.send({ embeds: [embed] });
         }
@@ -905,6 +936,17 @@ client.once(Events.ClientReady, () => {
 
     // Initialiser le Jackpot Chrono
     jackpot.init(client);
+
+    // Lana Sentinel - Invite Tracking
+    client.guilds.cache.forEach(async (guild) => {
+        try {
+            const invites = await guild.invites.fetch();
+            guildInvites.set(guild.id, new Map(invites.map(i => [i.code, i.uses])));
+            console.log(`[Sentinel] Invites chargées pour ${guild.name}`);
+        } catch (e) {
+            console.warn(`[Sentinel] Impossible de charger les invites pour ${guild.name}`);
+        }
+    });
 
     // Cron job pour le Jackpot Chrono (Check toutes les minutes pour être précis)
     cron.schedule('* * * * *', () => {

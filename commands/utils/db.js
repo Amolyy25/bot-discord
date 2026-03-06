@@ -28,11 +28,13 @@ async function initDB() {
             );
             CREATE TABLE IF NOT EXISTS user_trust (
                 user_id TEXT PRIMARY KEY,
-                trust_score INTEGER DEFAULT 30,
+                trust_score INTEGER DEFAULT 50,
                 total_messages INTEGER DEFAULT 0,
                 join_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 is_shadow_muted BOOLEAN DEFAULT FALSE,
                 last_bonus_date TIMESTAMPTZ,
+                last_daily_update DATE,
+                invite_count INTEGER DEFAULT 0,
                 last_content TEXT,
                 filtered_count INTEGER DEFAULT 0,
                 muted_until TIMESTAMPTZ,

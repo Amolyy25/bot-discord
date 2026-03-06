@@ -15,14 +15,16 @@ module.exports = {
         const targetMember = interaction.options.getMember('cible') || interaction.member;
         const data = await trust.getTrustData(targetMember.id);
 
+        const slowmodeActive = data.trust_score > 10 && data.trust_score <= 20;
+        
         const embed = new EmbedBuilder()
             .setTitle(`🛡️ Lana Sentinel - Profil de Confiance`)
             .setAuthor({ name: targetMember.user.tag, iconURL: targetMember.user.displayAvatarURL() })
-            .setColor(data.trust_score < 20 ? 0xFF0000 : (data.trust_score < 50 ? 0xFFAA00 : (data.trust_score < 80 ? 0xFFFF00 : 0x00FF00)))
+            .setColor(data.trust_score < 10 ? 0x010101 : (data.trust_score <= 20 ? 0xFF0000 : (data.trust_score < 50 ? 0xFFAA00 : (data.trust_score < 80 ? 0xFFFF00 : 0x00FF00))))
             .addFields(
                 { name: 'Score de Confiance', value: `**${data.trust_score}/100**`, inline: true },
                 { name: 'Messages Totaux', value: `${data.total_messages}`, inline: true },
-                { name: 'Statut Shadow Mute', value: data.is_shadow_muted ? '🔴 ACTIF' : '🟢 INACTIF', inline: true },
+                { name: 'Statut Spécial', value: data.is_shadow_muted || data.trust_score < 10 ? '🔴 Shadow Mute' : (slowmodeActive ? '🟡 Slowmode (30s)' : '🟢 Normal'), inline: true },
                 { name: 'Ancienneté', value: `<t:${Math.floor(targetMember.joinedTimestamp / 1000)}:R>`, inline: true }
             )
             .setThumbnail(targetMember.user.displayAvatarURL())
@@ -43,15 +45,16 @@ module.exports = {
         if (!target) target = message.member;
 
         const data = await trust.getTrustData(target.id);
+        const slowmodeActive = data.trust_score > 10 && data.trust_score <= 20;
 
         const embed = new EmbedBuilder()
             .setTitle(`🛡️ Lana Sentinel - Profil de Confiance`)
             .setAuthor({ name: target.user.tag, iconURL: target.user.displayAvatarURL() })
-            .setColor(data.trust_score < 20 ? 0xFF0000 : (data.trust_score < 50 ? 0xFFAA00 : (data.trust_score < 80 ? 0xFFFF00 : 0x00FF00)))
+            .setColor(data.trust_score < 10 ? 0x010101 : (data.trust_score <= 20 ? 0xFF0000 : (data.trust_score < 50 ? 0xFFAA00 : (data.trust_score < 80 ? 0xFFFF00 : 0x00FF00))))
             .addFields(
                 { name: 'Score de Confiance', value: `**${data.trust_score}/100**`, inline: true },
                 { name: 'Messages Totaux', value: `${data.total_messages}`, inline: true },
-                { name: 'Statut Shadow Mute', value: data.is_shadow_muted ? '🔴 ACTIF' : '🟢 INACTIF', inline: true }
+                { name: 'Statut Spécial', value: data.is_shadow_muted || data.trust_score < 10 ? '🔴 Shadow Mute' : (slowmodeActive ? '🟡 Slowmode (30s)' : '🟢 Normal'), inline: true }
             )
             .setTimestamp();
 

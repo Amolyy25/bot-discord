@@ -584,15 +584,13 @@ async function applySanction(message, violationType, details) {
   let gravityLabel = `Détection de spam (${userData.spamOccurrence}e fois)`;
   let durationStr = 'instantané';
 
-  if (score < 20) { // Hostile
+  if (score < 10) { // Critique
       await trust.setShadowMute(message.author.id, true);
-      trustData.filtered_count = (trustData.filtered_count || 0) + 1;
-      await pool.query('UPDATE user_trust SET filtered_count = $1 WHERE user_id = $2', [trustData.filtered_count, message.author.id]);
-      
-      if (trustData.filtered_count >= 10) {
-          await message.member.ban({ reason: '[Sentinelle] Ban auto (Hostile + 10 messages filtrés)' }).catch(() => {});
-      }
-      return; // Shadow mute gère le reste
+      return; 
+  } else if (score < 20) { // Hostile (Le slowmode individuel s'activera au prochain message)
+      sanctionType = 'tempmute';
+      sanctionLevel = 'Pénalité Hostile';
+      durationStr = '12h';
   } else if (score < 50) { // Suspect
       sanctionType = 'tempmute';
       sanctionLevel = 'Pénalité Suspect';
