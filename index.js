@@ -10,7 +10,7 @@ const antispam = require('./commands/utils/antispamHelper');
 const jackpot = require('./commands/utils/jackpotHelper');
 const antinuke = require('./commands/utils/antiNukeHelper');
 const trust = require('./commands/utils/trustHelper');
-const { initDB } = require('./commands/utils/db');
+const { initDB, query } = require('./commands/utils/db');
 const { migrateSanctions } = require('./commands/utils/sanctionsHelper');
 const { ROLES, checkPermission, loadPermissions, checkAndConsumeRole } = require('./commands/utils/permHelper');
 const { AuditLogEvent } = require('discord.js');
@@ -730,15 +730,9 @@ client.on('interactionCreate', async interaction => {
     const COMMU_VALIDATOR_ROLE     = commuSetup.VALIDATOR_ROLE;
     const COMMU_CHANNELS_CONFIG    = commuSetup.CHANNELS_CONFIG;
 
-    // Charge / sauvegarde les données commu
-    const commuDataPath = path.join(__dirname, 'commuData.json');
-    function loadCommuData() {
-        try { return JSON.parse(fs.readFileSync(commuDataPath, 'utf8')); }
-        catch { return { confessionCount: 0, voteTracker: {}, pendingSubmissions: {} }; }
-    }
-    function saveCommuData(data) {
-        fs.writeFileSync(commuDataPath, JSON.stringify(data, null, 2));
-    }
+    // Charge / sauvegarde les données commu (Migré vers DB)
+    // function loadCommuData() { ... }
+    // function saveCommuData(data) { ... }
 
     // Trouve le salon cible en fonction de la clé de config
     function findCommuChannel(guild, key) {
@@ -754,11 +748,16 @@ client.on('interactionCreate', async interaction => {
 
         // ── vote2profil ──────────────────────────────────────────────────────
         if (key === 'vote2profil') {
-            // Vérif limite 1 soumission/jour
-            const today = new Date().toISOString().slice(0, 10);
-            const tracker = data.voteTracker || {};
-            const userKey = `${interaction.user.id}_submit_${today}`;
-            if (tracker[userKey]) {
+            // Vérif limite 1 soumission/jour (via DB)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const existing = await query(
+                'SELECT 1 FROM community_submissions WHERE author_id = $1 AND type = $2 AND created_at >= $3 AND status != $4', 
+                [interaction.user.id, 'vote2profil', today, 'rejected']
+            );
+
+            if (existing.rowCount > 0) {
                 return interaction.reply({ content: '⏳ Tu as déjà soumis ton profil aujourd\'hui ! Reviens demain.', flags: 64 });
             }
 
@@ -898,24 +897,19 @@ client.on('interactionCreate', async interaction => {
 
                 if (uploadedFile?.url) publicEmbed.setImage(uploadedFile.url);
 
-                data.pendingSubmissions[submissionId] = {
-                    type: 'vote2profil',
-                    authorId: author.id,
-                    publicEmbedData: publicEmbed.toJSON(),
-                    channelKey: 'vote2profil',
-                    attachmentUrl: uploadedFile?.url || null,
-                    addReactions: true,
-                };
+                // Sauvegarde en DB
+                await query(
+                    'INSERT INTO community_submissions (id, type, author_id, content, attachment_url, status) VALUES ($1, $2, $3, $4, $5, $6)',
+                    [submissionId, 'vote2profil', author.id, JSON.stringify(publicEmbed.toJSON()), uploadedFile?.url || null, 'pending']
+                );
             }
 
             // ── les_dossiers ─────────────────────────────────────────────────
             if (key === 'les_dossiers') {
                 const dossierInfo   = interaction.fields.getTextInputValue('dossierInfo').trim();
-                // Récupérer le fichier uploadé
                 const uploadedFiles = interaction.fields.getUploadedFiles('dossierImage');
                 const uploadedFile  = uploadedFiles?.first() || null;
 
-                // Embed privé (staff voit l'auteur)
                 privateEmbed = new EmbedBuilder()
                     .setTitle('🗂️ Nouveau Dossier — À Valider')
                     .setColor(0xFF6B35)
@@ -929,7 +923,6 @@ client.on('interactionCreate', async interaction => {
 
                 if (uploadedFile?.url) privateEmbed.setImage(uploadedFile.url);
 
-                // Embed public — style épuré, contenu en avant
                 publicEmbed = new EmbedBuilder()
                     .setColor(0xFF6B35)
                     .setDescription(dossierInfo)
@@ -938,22 +931,21 @@ client.on('interactionCreate', async interaction => {
 
                 if (uploadedFile?.url) publicEmbed.setImage(uploadedFile.url);
 
-                data.pendingSubmissions[submissionId] = {
-                    type: 'les_dossiers',
-                    authorId: interaction.user.id,
-                    publicEmbedData: publicEmbed.toJSON(),
-                    channelKey: 'les_dossiers',
-                    attachmentUrl: uploadedFile?.url || null,
-                };
+                // Sauvegarde en DB
+                await query(
+                    'INSERT INTO community_submissions (id, type, author_id, content, attachment_url, status) VALUES ($1, $2, $3, $4, $5, $6)',
+                    [submissionId, 'les_dossiers', interaction.user.id, JSON.stringify(publicEmbed.toJSON()), uploadedFile?.url || null, 'pending']
+                );
             }
 
             // ── confession ───────────────────────────────────────────────────
             if (key === 'confession') {
                 const confessionText = interaction.fields.getTextInputValue('confessionText').trim();
-                data.confessionCount = (data.confessionCount || 0) + 1;
-                const confNum = data.confessionCount;
+                
+                // Gérer le compteur en DB
+                const statsRes = await query('UPDATE community_stats SET value = value + 1 WHERE key = $1 RETURNING value', ['confession_count']);
+                const confNum = statsRes.rows[0].value;
 
-                // Embed privé (staff voit l'auteur)
                 privateEmbed = new EmbedBuilder()
                     .setTitle(`👀 Confession #${confNum} — À Valider`)
                     .setColor(0x9B59B6)
@@ -964,7 +956,6 @@ client.on('interactionCreate', async interaction => {
                     .setFooter({ text: `ID soumission: ${submissionId}` })
                     .setTimestamp();
 
-                // Embed public (totalement anonyme)
                 publicEmbed = new EmbedBuilder()
                     .setTitle(`👀 Confession #${confNum}`)
                     .setColor(0x9B59B6)
@@ -972,15 +963,12 @@ client.on('interactionCreate', async interaction => {
                     .setFooter({ text: `Confession #${confNum} — Totalement anonyme` })
                     .setTimestamp();
 
-                data.pendingSubmissions[submissionId] = {
-                    type: 'confession',
-                    authorId: interaction.user.id,
-                    publicEmbedData: publicEmbed.toJSON(),
-                    channelKey: 'confession',
-                };
+                // Sauvegarde en DB
+                await query(
+                    'INSERT INTO community_submissions (id, type, author_id, content, attachment_url, status) VALUES ($1, $2, $3, $4, $5, $6)',
+                    [submissionId, 'confession', interaction.user.id, JSON.stringify(publicEmbed.toJSON()), null, 'pending']
+                );
             }
-
-            saveCommuData(data);
 
             // ── Envoi dans le salon de validation ────────────────────────────
             const approveRow = new ActionRowBuilder().addComponents(
@@ -1034,61 +1022,46 @@ client.on('interactionCreate', async interaction => {
         const isApprove = interaction.customId.startsWith('commu_approve_');
         const submissionId = interaction.customId.replace('commu_approve_', '').replace('commu_refuse_', '');
 
-        const data = loadCommuData();
-        const submission = data.pendingSubmissions?.[submissionId];
+        const submissionRes = await query('SELECT * FROM community_submissions WHERE id = $1', [submissionId]);
+        const submission = submissionRes.rows[0];
 
-        if (!submission) {
-            // Déjà traitée
+        if (!submission || submission.status !== 'pending') {
             await interaction.message.edit({ components: [] }).catch(() => {});
             return interaction.reply({ content: '⚠️ Cette soumission a déjà été traitée ou est introuvable.', flags: 64 });
         }
 
-        // Supprimer de la liste en attente
-        delete data.pendingSubmissions[submissionId];
-
         if (isApprove) {
             // ── Publication dans le bon salon ────────────────────────────────
             try {
-                const targetChannel = findCommuChannel(interaction.guild, submission.channelKey);
+                const channelKey = submission.type === 'vote2profil' ? 'vote2profil' : 
+                                  submission.type === 'les_dossiers' ? 'les_dossiers' : 
+                                  'confession';
+                const targetChannel = findCommuChannel(interaction.guild, channelKey);
 
                 if (!targetChannel) {
-                    saveCommuData(data);
                     return interaction.reply({
-                        content: `❌ Salon de destination introuvable pour \`${submission.channelKey}\`. Vérifiez que le setup a été fait.`,
+                        content: `❌ Salon de destination introuvable pour \`${channelKey}\`.`,
                         flags: 64,
                     });
                 }
 
-                // Rebuilder l'embed public depuis les données sauvegardées
-                const { EmbedBuilder: EB } = require('discord.js');
-                const publicEmbed = new EB(submission.publicEmbedData);
+                // Rebuilder l'embed public depuis JSON
+                const publicEmbed = new EmbedBuilder(JSON.parse(submission.content));
 
-                // Pour vote2profil : marquer la soumission du jour (limite 1/jour)
-                if (submission.type === 'vote2profil') {
-                    const today = new Date().toISOString().slice(0, 10);
-                    const userKey = `${submission.authorId}_submit_${today}`;
-                    data.voteTracker = data.voteTracker || {};
-                    data.voteTracker[userKey] = true;
+                // Mettre à jour en DB
+                await query(
+                    'UPDATE community_submissions SET status = $1, validated_at = CURRENT_TIMESTAMP, validator_id = $2 WHERE id = $3',
+                    ['approved', interaction.user.id, submissionId]
+                );
 
-                    // Nettoyage des anciens trackers (> 2 jours)
-                    for (const k of Object.keys(data.voteTracker)) {
-                        const parts = k.split('_submit_');
-                        if (parts[1] && parts[1] < new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)) {
-                            delete data.voteTracker[k];
-                        }
-                    }
-                }
-
-                saveCommuData(data);
-
-                // Récupérer la config du salon pour recréer le bouton
-                const channelConfig = COMMU_CHANNELS_CONFIG.find(c => c.key === submission.channelKey);
+                // Récupérer la config pour le bouton
+                const channelConfig = COMMU_CHANNELS_CONFIG.find(c => c.key === channelKey);
                 let components = [];
                 if (channelConfig) {
                     let label = channelConfig.buttonLabel;
-                    if (submission.channelKey === 'vote2profil') label = '👘 Proposer un Vote2Profil';
-                    if (submission.channelKey === 'les_dossiers') label = '🗂️ Balancer un dossier';
-                    if (submission.channelKey === 'confession') label = '🤫 Écrire une confession';
+                    if (channelKey === 'vote2profil') label = '👘 Proposer un Vote2Profil';
+                    if (channelKey === 'les_dossiers') label = '🗂️ Balancer un dossier';
+                    if (channelKey === 'confession') label = '🤫 Écrire une confession';
 
                     const actionButton = new ButtonBuilder()
                         .setCustomId(channelConfig.buttonCustomId)
@@ -1097,14 +1070,14 @@ client.on('interactionCreate', async interaction => {
                     components.push(new ActionRowBuilder().addComponents(actionButton));
                 }
 
-                // Publication dans le salon cible
+                // Publication
                 const sentMsg = await targetChannel.send({ 
                     embeds: [publicEmbed],
                     components: components
                 });
 
-                // Pour vote2profil : ajouter les réactions 👍 / 👎
-                if (submission.addReactions) {
+                // Réactions pour vote2profil
+                if (submission.type === 'vote2profil') {
                     await sentMsg.react('👍').catch(() => {});
                     await sentMsg.react('👎').catch(() => {});
                 }
@@ -1139,9 +1112,11 @@ client.on('interactionCreate', async interaction => {
 
             refuseModal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
 
-            // Remettre la soumission temporairement (sera supprimée après le modal)
-            data.pendingSubmissions[submissionId] = submission;
-            saveCommuData(data);
+            // Mettre à jour en DB
+            await query(
+                'UPDATE community_submissions SET status = $1, validated_at = CURRENT_TIMESTAMP, validator_id = $2 WHERE id = $3',
+                ['refusing_process', interaction.user.id, submissionId]
+            );
 
             return await interaction.showModal(refuseModal);
         }
@@ -1153,18 +1128,19 @@ client.on('interactionCreate', async interaction => {
         const submissionId = interaction.customId.replace('commu_refuse_reason_', '');
         const reason = interaction.fields.getTextInputValue('refuseReason').trim() || 'Aucune raison fournie';
 
-        const data = loadCommuData();
-        const submission = data.pendingSubmissions?.[submissionId];
+        const submissionRes = await query('SELECT * FROM community_submissions WHERE id = $1', [submissionId]);
+        const submission = submissionRes.rows[0];
 
         if (!submission) {
-            return interaction.reply({ content: '⚠️ Soumission déjà traitée.', flags: 64 });
+            return interaction.reply({ content: '⚠️ Soumission introuvable.', flags: 64 });
         }
 
-        delete data.pendingSubmissions[submissionId];
+        // Marquer comme définitivement rejeté
+        await query('UPDATE community_submissions SET status = $1 WHERE id = $2', ['rejected', submissionId]);
 
         // Notifier l'auteur de manière privée
         try {
-            const author = await client.users.fetch(submission.authorId).catch(() => null);
+            const author = await client.users.fetch(submission.author_id).catch(() => null);
             if (author) {
                 const refusedEmbed = new EmbedBuilder()
                     .setTitle('❌ Votre soumission a été refusée')

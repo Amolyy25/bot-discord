@@ -42,6 +42,27 @@ async function initDB() {
                 weekly_constructive_count INTEGER DEFAULT 0
             );
 
+            CREATE TABLE IF NOT EXISTS community_submissions (
+                id TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                author_id TEXT NOT NULL,
+                content TEXT,
+                attachment_url TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                validated_at TIMESTAMPTZ,
+                validator_id TEXT,
+                staff_msg_id TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS community_stats (
+                key TEXT PRIMARY KEY,
+                value INTEGER DEFAULT 0
+            );
+
+            -- Initialisation du compteur de confessions si inexistant
+            INSERT INTO community_stats (key, value) VALUES ('confession_count', 0) ON CONFLICT DO NOTHING;
+
             -- Migrations pour les colonnes existantes (Sentinel v1 -> Sentinel v2)
             DO $$ 
             BEGIN 
@@ -68,7 +89,7 @@ async function initDB() {
                 END IF;
             END $$;
         `);
-        console.log('[DB] Tables sanctions et user_trust vérifiées/créées.');
+        console.log('[DB] Tables sanctions, user_trust et community vérifiées/créées.');
     } catch (err) {
         console.error('[DB] Erreur lors de l\'initialisation:', err);
     } finally {
