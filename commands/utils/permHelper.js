@@ -411,5 +411,7 @@ module.exports = {
     loadPermissions,
 
     isModChannel: (channelId) => channelId === MOD_CHANNEL_ID,
-    isBoosterOrPerm2: (member) => member.roles.cache.has(ROLES.BOOSTER) || hasPermLevel(member, ROLES.PERM_2)
+    isBoosterOrPerm2: (member) => member.roles.cache.has(ROLES.BOOSTER) || hasPermLevel(member, ROLES.PERM_2),
+    COMMAND_PERMS,
+    COMMAND_QUOTAS
 };

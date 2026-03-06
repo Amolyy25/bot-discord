@@ -9,101 +9,111 @@ module.exports = {
 
     async execute(interaction) {
         const perms = loadPermissions();
-
-        if (Object.keys(perms).length === 0) {
-            return interaction.reply({ content: '❌ Aucune permission spéciale n\'a été configurée.', flags: 64 });
-        }
+        const { COMMAND_PERMS, COMMAND_QUOTAS, ROLES } = require('./utils/permHelper');
 
         const embed = new EmbedBuilder()
-            .setTitle('📋 Liste des Permissions Spéciales')
-            .setColor('#0099ff')
+            .setTitle('📂 Architecture des Permissions - LE SECTEUR')
+            .setDescription('*Voici la configuration actuelle des accès et des quotas de modération.*')
+            .setColor('#1a1a1a')
+            .setThumbnail(interaction.guild.iconURL())
             .setTimestamp()
-            .setFooter({ text: 'Géré par permHelper' });
+            .setFooter({ text: 'Système de Sécurité LANA v2', iconURL: interaction.client.user.displayAvatarURL() });
 
-        let hasFields = false;
+        // 1. Hiérarchie Statique
+        const hierarchyText = [
+            `👑 **ADMIN / OWN** (Accès Total)`,
+            `🛡️ **SOUVERAIN** (<@&${ROLES.SOUVERAIN}>) - Rankup & Perm II/III`,
+            `🎖️ **PERM V** (<@&${ROLES.PERM_5}>) - Soumis, Lock, BL`,
+            `🎖️ **PERM IV** (<@&${ROLES.PERM_4}>) - Kick, Mute, VLock`,
+            `🎖️ **PERM III** (<@&${ROLES.PERM_3}>) - Sanctions, VKick, Snipe`,
+            `🎖️ **PERM II** (<@&${ROLES.PERM_2}>) - TempMute, Unmute, VMute`,
+            `🎖️ **PERM I** (<@&${ROLES.PERM_1}>) - Warn, Info`
+        ].join('\n');
 
-        for (const [commandName, permData] of Object.entries(perms)) {
-            let userList = 'Aucun';
-            let roleList = 'Aucun';
+        embed.addFields({ name: '📊 Hiérarchie Staff', value: hierarchyText });
 
-            // Formatage des utilisateurs
-            if (permData.users && permData.users.length > 0) {
-                userList = permData.users.map(id => `<@${id}>`).join(', ');
-            }
+        // 2. Quotas de Modération
+        let quotaText = '';
+        for (const [cmd, data] of Object.entries(COMMAND_QUOTAS)) {
+            const windowMin = data.window / 60000;
+            const windowText = windowMin >= 60 ? `${windowMin / 60}h` : `${windowMin}min`;
+            quotaText += `• \`${cmd}\`: **${data.limit}** usages / ${windowText}\n`;
+        }
+        embed.addFields({ name: '⏳ Quotas de Sécurité', value: quotaText || 'Aucun quota configuré', inline: true });
 
-            // Formatage des rôles avec limites éventuelles
-            if (permData.roles && permData.roles.length > 0) {
-                roleList = permData.roles.map(id => {
-                    const limit = permData.roleLimits && permData.roleLimits[id];
-                    const limitText = limit ? ` (Limite: ${limit})` : '';
-                    return `<@&${id}>${limitText}`;
-                }).join('\n');
-            }
-
-            // On n'affiche que si il y a quelque chose
-            if ((permData.users && permData.users.length > 0) || (permData.roles && permData.roles.length > 0)) {
-                embed.addFields({
-                    name: `🔹 Commande: ${commandName}`,
-                    value: `**Utilisateurs:** ${userList}\n**Rôles:**\n${roleList}`,
-                    inline: false
-                });
-                hasFields = true;
+        // 3. Permissions Dynamiques (addperm)
+        let dynamicText = '';
+        const allDynamicCmds = Object.keys(perms);
+        
+        if (allDynamicCmds.length === 0) {
+            dynamicText = '*Aucune permission dynamique accordée.*';
+        } else {
+            for (const cmd of allDynamicCmds) {
+                const data = perms[cmd];
+                let targets = [];
+                if (data.users?.length) targets.push(...data.users.map(id => `<@${id}>`));
+                if (data.roles?.length) targets.push(...data.roles.map(id => {
+                    const limit = data.roleLimits?.[id] ? ` (\`${data.roleLimits[id]}x\`)` : '';
+                    return `<@&${id}>${limit}`;
+                }));
+                
+                if (targets.length > 0) {
+                    dynamicText += `🔹 \`${cmd}\`: ${targets.join(', ')}\n`;
+                }
             }
         }
+        embed.addFields({ name: '⚡ Accès Dynamiques (Addperm)', value: dynamicText || '*Aucun*', inline: false });
 
-        if (!hasFields) {
-            return interaction.reply({ content: '❌ Aucune permission active trouvée (fichiers vides ou nettoyés).', flags: 64 });
-        }
-
-        await interaction.reply({ embeds: [embed], flags: 64 });
+        await interaction.reply({ embeds: [embed] });
     },
 
     async executeMessage(message) {
-        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-            return message.reply('❌ Vous n\'avez pas la permission d\'utiliser cette commande.');
-        }
+        const { checkPermission } = require('./utils/permHelper');
+        if (!checkPermission(message.member, 'listperm')) return;
 
         const perms = loadPermissions();
-        if (Object.keys(perms).length === 0) {
-            return message.reply('❌ Aucune permission spéciale n\'a été configurée.');
-        }
+        const { COMMAND_PERMS, COMMAND_QUOTAS, ROLES } = require('./utils/permHelper');
 
         const embed = new EmbedBuilder()
-            .setTitle('📋 Liste des Permissions Spéciales')
-            .setColor('#0099ff')
-            .setTimestamp();
+            .setTitle('📂 Architecture des Permissions - LE SECTEUR')
+            .setDescription('*Voici la configuration actuelle des accès et des quotas de modération.*')
+            .setColor('#1a1a1a')
+            .setThumbnail(message.guild.iconURL())
+            .setTimestamp()
+            .setFooter({ text: 'Système de Sécurité LANA v2', iconURL: message.client.user.displayAvatarURL() });
 
-        let hasFields = false;
+        const hierarchyText = [
+            `👑 **ADMIN / OWN** (Accès Total)`,
+            `🛡️ **SOUVERAIN** (<@&${ROLES.SOUVERAIN}>)`,
+            `🎖️ **PERM V** (<@&${ROLES.PERM_5}>)`,
+            `🎖️ **PERM IV** (<@&${ROLES.PERM_4}>)`,
+            `🎖️ **PERM III** (<@&${ROLES.PERM_3}>)`,
+            `🎖️ **PERM II** (<@&${ROLES.PERM_2}>)`,
+            `🎖️ **PERM I** (<@&${ROLES.PERM_1}>)`
+        ].join('\n');
 
-        for (const [commandName, permData] of Object.entries(perms)) {
-            let userList = 'Aucun';
-            let roleList = 'Aucun';
+        embed.addFields({ name: '📊 Hiérarchie Staff', value: hierarchyText });
 
-            if (permData.users && permData.users.length > 0) {
-                userList = permData.users.map(id => `<@${id}>`).join(', ');
-            }
-
-            if (permData.roles && permData.roles.length > 0) {
-                roleList = permData.roles.map(id => {
-                    const limit = permData.roleLimits && permData.roleLimits[id];
-                    const limitText = limit ? ` (Limite: ${limit})` : '';
-                    return `<@&${id}>${limitText}`;
-                }).join('\n'); // Saut de ligne pour lisibilité si plusieurs rôles
-            }
-
-            if ((permData.users && permData.users.length > 0) || (permData.roles && permData.roles.length > 0)) {
-                embed.addFields({
-                    name: `🔹 Commande: ${commandName}`,
-                    value: `**Utilisateurs:** ${userList}\n**Rôles:**\n${roleList}`,
-                    inline: false
-                });
-                hasFields = true;
-            }
+        let quotaText = '';
+        for (const [cmd, data] of Object.entries(COMMAND_QUOTAS)) {
+            const windowMin = data.window / 60000;
+            const windowText = windowMin >= 60 ? `${windowMin / 60}h` : `${windowMin}min`;
+            quotaText += `• \`${cmd}\`: **${data.limit}** / ${windowText}\n`;
         }
+        embed.addFields({ name: '⏳ Quotas', value: quotaText || 'Aucun', inline: true });
 
-        if (!hasFields) {
-            return message.reply('❌ Aucune permission active trouvée.');
+        let dynamicText = '';
+        for (const cmd of Object.keys(perms)) {
+            const data = perms[cmd];
+            let targets = [];
+            if (data.users?.length) targets.push(...data.users.map(id => `<@${id}>`));
+            if (data.roles?.length) targets.push(...data.roles.map(id => {
+                const limit = data.roleLimits?.[id] ? ` (\`${data.roleLimits[id]}x\`)` : '';
+                return `<@&${id}>${limit}`;
+            }));
+            if (targets.length > 0) dynamicText += `🔹 \`${cmd}\`: ${targets.join(', ')}\n`;
         }
+        embed.addFields({ name: '⚡ Accès Dynamiques', value: dynamicText || '*Aucun*', inline: false });
 
         message.reply({ embeds: [embed] });
     }
