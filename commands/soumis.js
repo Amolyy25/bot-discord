@@ -54,7 +54,7 @@ module.exports = {
 
         const executeAction = async () => {
             await trust.applySoumis(target, 24, `Manuel (Message) par ${message.author.tag}`);
-            await message.channel.send(`✅ ${target} a été soumis.`);
+            await message.channel.send(`${target} est maintenant la soumise de ${message.author.tag} !`);
         };
 
         if (getStaffLevel(target) > 0) {
