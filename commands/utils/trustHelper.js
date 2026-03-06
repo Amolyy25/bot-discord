@@ -14,7 +14,9 @@ const SCORE_THRESHOLDS = {
     NEUTRE: 80
 };
 
-// ... (Listes de mots inchangées)
+// Listes de mots
+const VULGARITY_WORDS = ['fdp', 'fdv', 'ntgrm']; // Liste 1
+const HATE_WORDS = ['bougnoule', 'nègre','hitler', 'nazi', 'viole']; // Liste 2
 
 /**
  * Initialise ou récupère le score d'un utilisateur
