@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, FileUploadBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, FileUploadBuilder, LabelBuilder } = require('discord.js');
 const commuSetup = require('./commands/setupcommu');
 const fs = require('fs');
 const path = require('path');
@@ -48,8 +48,7 @@ const client = new Client({
         GatewayIntentBits.GuildMessageReactions, // Ajout de l'intent pour les réactions
         GatewayIntentBits.GuildPresences // Requis pour le comptage des membres en ligne
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction], // Ajout des partiels pour gérer les messages non cachés
-    rest: { version: '11' } // INDISPENSABLE pour FileUploadBuilder dans les modals
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction] // Ajout des partiels pour gérer les messages non cachés
 });
 
 client.commands = new Collection();
@@ -59,6 +58,31 @@ const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('
 
 // Lana Sentinel - Invite Tracking Cache
 const guildInvites = new Map();
+
+// REST v11 pour les fonctionnalités expérimentales (FileUpload dans modals)
+const v11REST = new REST({ version: '11' }).setToken(process.env.TOKEN);
+
+/**
+ * Helper pour envoyer un modal via l'API v11
+ * Permet d'utiliser FileUploadBuilder sans casser le gateway v10
+ */
+async function showV11Modal(interaction, modal) {
+    try {
+        await v11REST.post(
+            Routes.interactionCallback(interaction.id, interaction.token),
+            {
+                body: {
+                    type: 9, // InteractionResponseType.Modal
+                    data: modal.toJSON()
+                }
+            }
+        );
+    } catch (err) {
+        console.error('[v11Modal] Erreur:', err);
+        // Fallback si v11 échoue vraiment
+        try { await interaction.showModal(modal); } catch {}
+    }
+}
 
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
@@ -768,21 +792,25 @@ client.on('interactionCreate', async interaction => {
 
             const descInput = new TextInputBuilder()
                 .setCustomId('voteDesc')
-                .setLabel('Présente-toi en quelques mots')
-                .setStyle(TextInputStyle.Paragraph)
                 .setPlaceholder('Qui tu es, tes intérêts, pourquoi tu mérites d\'avoir un bon profil...')
+                .setStyle(TextInputStyle.Paragraph)
                 .setRequired(true)
                 .setMaxLength(500);
+
+            const descLabel = new LabelBuilder()
+                .setLabel('Présente-toi en quelques mots')
+                .setTextInputComponent(descInput);
 
             const imageUpload = new FileUploadBuilder()
                 .setCustomId('voteImage')
                 .setRequired(false);
 
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(descInput),
-                new ActionRowBuilder().addComponents(imageUpload)
-            );
-            return await interaction.showModal(modal);
+            const imageLabel = new LabelBuilder()
+                .setLabel('Ajoute une photo (Drag & Drop)')
+                .setFileUploadComponent(imageUpload);
+
+            modal.addLabelComponents(descLabel, imageLabel);
+            return await showV11Modal(interaction, modal);
         }
 
         // ── les_dossiers ─────────────────────────────────────────────────────
@@ -793,21 +821,25 @@ client.on('interactionCreate', async interaction => {
 
             const infoInput = new TextInputBuilder()
                 .setCustomId('dossierInfo')
-                .setLabel('Votre information (restera anonyme)')
-                .setStyle(TextInputStyle.Paragraph)
                 .setPlaceholder('Décrivez l\'information en détail...')
+                .setStyle(TextInputStyle.Paragraph)
                 .setRequired(true)
                 .setMaxLength(1500);
+
+            const infoLabel = new LabelBuilder()
+                .setLabel('Votre information (restera anonyme)')
+                .setTextInputComponent(infoInput);
 
             const imageUpload = new FileUploadBuilder()
                 .setCustomId('dossierImage')
                 .setRequired(false);
 
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(infoInput),
-                new ActionRowBuilder().addComponents(imageUpload)
-            );
-            return await interaction.showModal(modal);
+            const imageLabel = new LabelBuilder()
+                .setLabel('Image jointe (Drag & Drop)')
+                .setFileUploadComponent(imageUpload);
+
+            modal.addLabelComponents(infoLabel, imageLabel);
+            return await showV11Modal(interaction, modal);
         }
 
         // ── confession ───────────────────────────────────────────────────────
@@ -818,16 +850,17 @@ client.on('interactionCreate', async interaction => {
 
             const confessionInput = new TextInputBuilder()
                 .setCustomId('confessionText')
-                .setLabel('Votre confession (totalement anonyme)')
-                .setStyle(TextInputStyle.Paragraph)
                 .setPlaceholder('Écrivez votre confession ici...')
+                .setStyle(TextInputStyle.Paragraph)
                 .setRequired(true)
                 .setMaxLength(1500);
 
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(confessionInput)
-            );
-            return await interaction.showModal(modal);
+            const confessionLabel = new LabelBuilder()
+                .setLabel('Votre confession (totalement anonyme)')
+                .setTextInputComponent(confessionInput);
+
+            modal.addLabelComponents(confessionLabel);
+            return await showV11Modal(interaction, modal);
         }
     }
 
