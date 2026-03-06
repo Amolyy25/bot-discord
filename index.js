@@ -773,13 +773,16 @@ client.on('interactionCreate', async interaction => {
                 .setRequired(true)
                 .setMaxLength(500);
 
-            const imageUpload = new FileUploadBuilder()
+            const imageInput = new TextInputBuilder()
                 .setCustomId('voteImage')
+                .setLabel('Photo (lien URL, optionnel)')
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder('https://imgur.com/... ou lien Discord CDN')
                 .setRequired(false);
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(descInput),
-                new ActionRowBuilder().addComponents(imageUpload)
+                new ActionRowBuilder().addComponents(imageInput)
             );
             return await interaction.showModal(modal);
         }
@@ -798,13 +801,16 @@ client.on('interactionCreate', async interaction => {
                 .setRequired(true)
                 .setMaxLength(1500);
 
-            const imageUpload = new FileUploadBuilder()
+            const imageInput = new TextInputBuilder()
                 .setCustomId('dossierImage')
+                .setLabel('Image (lien URL, optionnel)')
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder('https://imgur.com/... ou lien Discord CDN')
                 .setRequired(false);
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(infoInput),
-                new ActionRowBuilder().addComponents(imageUpload)
+                new ActionRowBuilder().addComponents(imageInput)
             );
             return await interaction.showModal(modal);
         }
@@ -847,9 +853,8 @@ client.on('interactionCreate', async interaction => {
             // ── vote2profil ──────────────────────────────────────────────────
             if (key === 'vote2profil') {
                 const voteDesc = interaction.fields.getTextInputValue('voteDesc').trim();
-                // Récupérer le fichier uploadé
-                const uploadedFiles = interaction.fields.getUploadedFiles('voteImage');
-                const uploadedFile  = uploadedFiles?.[0] || null;
+                const voteImageUrl = interaction.fields.getTextInputValue('voteImage').trim();
+                const uploadedFile = voteImageUrl ? { url: voteImageUrl } : null;
 
                 // Le sujet c'est le membre lui-même
                 const author = interaction.user;
@@ -901,9 +906,8 @@ client.on('interactionCreate', async interaction => {
             // ── les_dossiers ─────────────────────────────────────────────────
             if (key === 'les_dossiers') {
                 const dossierInfo   = interaction.fields.getTextInputValue('dossierInfo').trim();
-                // Récupérer le fichier uploadé (FileUploadBuilder)
-                const uploadedFiles = interaction.fields.getUploadedFiles('dossierImage');
-                const uploadedFile  = uploadedFiles?.[0] || null;
+                const dossierImageUrl = interaction.fields.getTextInputValue('dossierImage').trim();
+                const uploadedFile = dossierImageUrl ? { url: dossierImageUrl } : null;
 
                 // Embed privé (staff voit l'auteur)
                 privateEmbed = new EmbedBuilder()
