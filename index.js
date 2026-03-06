@@ -59,30 +59,6 @@ const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('
 // Lana Sentinel - Invite Tracking Cache
 const guildInvites = new Map();
 
-// REST v11 pour les fonctionnalités expérimentales (FileUpload dans modals)
-const v11REST = new REST({ version: '11' }).setToken(process.env.TOKEN);
-
-/**
- * Helper pour envoyer un modal via l'API v11
- * Permet d'utiliser FileUploadBuilder sans casser le gateway v10
- */
-async function showV11Modal(interaction, modal) {
-    try {
-        await v11REST.post(
-            Routes.interactionCallback(interaction.id, interaction.token),
-            {
-                body: {
-                    type: 9, // InteractionResponseType.Modal
-                    data: modal.toJSON()
-                }
-            }
-        );
-    } catch (err) {
-        console.error('[v11Modal] Erreur:', err);
-        // Fallback si v11 échoue vraiment
-        try { await interaction.showModal(modal); } catch {}
-    }
-}
 
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
@@ -810,7 +786,7 @@ client.on('interactionCreate', async interaction => {
                 .setFileUploadComponent(imageUpload);
 
             modal.addLabelComponents(descLabel, imageLabel);
-            return await showV11Modal(interaction, modal);
+            return await interaction.showModal(modal);
         }
 
         // ── les_dossiers ─────────────────────────────────────────────────────
@@ -839,7 +815,7 @@ client.on('interactionCreate', async interaction => {
                 .setFileUploadComponent(imageUpload);
 
             modal.addLabelComponents(infoLabel, imageLabel);
-            return await showV11Modal(interaction, modal);
+            return await interaction.showModal(modal);
         }
 
         // ── confession ───────────────────────────────────────────────────────
@@ -860,7 +836,7 @@ client.on('interactionCreate', async interaction => {
                 .setTextInputComponent(confessionInput);
 
             modal.addLabelComponents(confessionLabel);
-            return await showV11Modal(interaction, modal);
+            return await interaction.showModal(modal);
         }
     }
 
@@ -881,9 +857,9 @@ client.on('interactionCreate', async interaction => {
             // ── vote2profil ──────────────────────────────────────────────────
             if (key === 'vote2profil') {
                 const voteDesc = interaction.fields.getTextInputValue('voteDesc').trim();
-                // Récupérer le fichier uploadé via l'API v11
+                // Récupérer le fichier uploadé
                 const uploadedFiles = interaction.fields.getUploadedFiles('voteImage');
-                const uploadedFile  = uploadedFiles.first() || null; // first() sur la collection d'attachments
+                const uploadedFile  = uploadedFiles?.first() || null; 
 
                 // Le sujet c'est le membre lui-même
                 const author = interaction.user;
@@ -935,9 +911,9 @@ client.on('interactionCreate', async interaction => {
             // ── les_dossiers ─────────────────────────────────────────────────
             if (key === 'les_dossiers') {
                 const dossierInfo   = interaction.fields.getTextInputValue('dossierInfo').trim();
-                // Récupérer le fichier uploadé via l'API v11
+                // Récupérer le fichier uploadé
                 const uploadedFiles = interaction.fields.getUploadedFiles('dossierImage');
-                const uploadedFile  = uploadedFiles.first() || null;
+                const uploadedFile  = uploadedFiles?.first() || null;
 
                 // Embed privé (staff voit l'auteur)
                 privateEmbed = new EmbedBuilder()
