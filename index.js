@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, FileUploadBuilder } = require('discord.js');
 const commuSetup = require('./commands/setupcommu');
 const fs = require('fs');
 const path = require('path');
@@ -753,43 +753,33 @@ client.on('interactionCreate', async interaction => {
 
         // ── vote2profil ──────────────────────────────────────────────────────
         if (key === 'vote2profil') {
-            // Vérif limite 1 vote/jour
+            // Vérif limite 1 soumission/jour
             const today = new Date().toISOString().slice(0, 10);
             const tracker = data.voteTracker || {};
-            const userKey = `${interaction.user.id}_${today}`;
+            const userKey = `${interaction.user.id}_submit_${today}`;
             if (tracker[userKey]) {
-                return interaction.reply({ content: '⏳ Tu as déjà voté aujourd\'hui ! Reviens demain.', flags: 64 });
+                return interaction.reply({ content: '⏳ Tu as déjà soumis ton profil aujourd\'hui ! Reviens demain.', flags: 64 });
             }
 
             const modal = new ModalBuilder()
                 .setCustomId('commu_modal_vote2profil')
-                .setTitle('🗳️ Voter pour un profil');
+                .setTitle('👘 Soumettre ton profil');
 
-            const targetInput = new TextInputBuilder()
-                .setCustomId('voteTarget')
-                .setLabel('ID ou @Mention de la personne')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('Ex: 123456789012345678 ou @Pseudo')
-                .setRequired(true);
-
-            const imageInput = new TextInputBuilder()
-                .setCustomId('voteImage')
-                .setLabel('Lien d\'une image (optionnel)')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('https://...')
-                .setRequired(false);
-
-            const commentInput = new TextInputBuilder()
-                .setCustomId('voteComment')
-                .setLabel('Commentaire (optionnel)')
+            const descInput = new TextInputBuilder()
+                .setCustomId('voteDesc')
+                .setLabel('Présente-toi en quelques mots')
                 .setStyle(TextInputStyle.Paragraph)
-                .setPlaceholder('Pourquoi voter pour cette personne ?')
+                .setPlaceholder('Qui tu es, tes intérêts, pourquoi tu mérites d\'avoir un bon profil...')
+                .setRequired(true)
+                .setMaxLength(500);
+
+            const imageUpload = new FileUploadBuilder()
+                .setCustomId('voteImage')
                 .setRequired(false);
 
             modal.addComponents(
-                new ActionRowBuilder().addComponents(targetInput),
-                new ActionRowBuilder().addComponents(imageInput),
-                new ActionRowBuilder().addComponents(commentInput)
+                new ActionRowBuilder().addComponents(descInput),
+                new ActionRowBuilder().addComponents(imageUpload)
             );
             return await interaction.showModal(modal);
         }
@@ -808,16 +798,13 @@ client.on('interactionCreate', async interaction => {
                 .setRequired(true)
                 .setMaxLength(1500);
 
-            const imageInput = new TextInputBuilder()
+            const imageUpload = new FileUploadBuilder()
                 .setCustomId('dossierImage')
-                .setLabel('Lien d\'une image (optionnel)')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('https://...')
                 .setRequired(false);
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(infoInput),
-                new ActionRowBuilder().addComponents(imageInput)
+                new ActionRowBuilder().addComponents(imageUpload)
             );
             return await interaction.showModal(modal);
         }
@@ -859,88 +846,94 @@ client.on('interactionCreate', async interaction => {
 
             // ── vote2profil ──────────────────────────────────────────────────
             if (key === 'vote2profil') {
-                const voteTarget   = interaction.fields.getTextInputValue('voteTarget').trim();
-                const voteImage    = interaction.fields.getTextInputValue('voteImage').trim();
-                const voteComment  = interaction.fields.getTextInputValue('voteComment').trim();
+                const voteDesc = interaction.fields.getTextInputValue('voteDesc').trim();
+                // Récupérer le fichier uploadé
+                const uploadedFiles = interaction.fields.getUploadedFiles('voteImage');
+                const uploadedFile  = uploadedFiles?.[0] || null;
 
-                // Extraire l'ID si mention
-                const mentionMatch = voteTarget.match(/<@!?(\d+)>/);
-                const targetId = mentionMatch ? mentionMatch[1] : voteTarget.replace(/\D/g, '');
-                let targetUser = null;
-                try { targetUser = await client.users.fetch(targetId); } catch {}
+                // Le sujet c'est le membre lui-même
+                const author = interaction.user;
+                const member = interaction.member;
+                const displayName = member?.displayName || author.username;
+                const avatarUrl = author.displayAvatarURL({ dynamic: true, size: 256 });
 
-                // Embed privé (staff voit l'auteur et la cible)
+                // Embed privé (staff voit l'auteur + présentation)
                 privateEmbed = new EmbedBuilder()
-                    .setTitle('🗳️ Nouveau Vote — À Valider')
+                    .setTitle('👘 Profil à Valider')
                     .setColor(0xE91E8C)
+                    .setThumbnail(avatarUrl)
                     .addFields(
-                        { name: '🗳️ Vote émis par', value: `<@${interaction.user.id}> (${interaction.user.tag})`, inline: true },
-                        { name: '🎯 Vote pour', value: targetUser ? `<@${targetUser.id}> (${targetUser.tag})` : `ID: ${targetId}`, inline: true },
-                        { name: '💬 Commentaire', value: voteComment || '*Aucun*', inline: false }
+                        { name: '👤 Membre', value: `<@${author.id}> (${author.tag})`, inline: true },
+                        { name: '📝 Présentation', value: voteDesc, inline: false },
+                        { name: '🖼️ Photo', value: uploadedFile ? `[Voir le fichier](${uploadedFile.url})` : '*Aucune*', inline: false }
                     )
                     .setFooter({ text: `ID soumission: ${submissionId}` })
                     .setTimestamp();
 
-                if (voteImage) privateEmbed.setImage(voteImage);
-                if (targetUser) privateEmbed.setThumbnail(targetUser.displayAvatarURL({ dynamic: true }));
+                if (uploadedFile?.url) privateEmbed.setImage(uploadedFile.url);
 
-                // Embed public (anonyme)
+                // Embed public — profil du membre avec vote communautaire
                 publicEmbed = new EmbedBuilder()
-                    .setTitle('🗳️ Nouveau Vote !')
+                    .setAuthor({ name: displayName, iconURL: avatarUrl })
+                    .setTitle(`👘 Profil de ${displayName}`)
                     .setColor(0xE91E8C)
-                    .setDescription(`Un membre a voté pour <@${targetUser?.id || targetId}> !${voteComment ? `\n\n> *"${voteComment}"*` : ''}`)
-                    .setFooter({ text: 'Système de vote anonyme' })
+                    .setThumbnail(avatarUrl)
+                    .setDescription(voteDesc)
+                    .addFields(
+                        { name: '💬 Pseudo', value: `<@${author.id}>`, inline: true },
+                        { name: '⏳ Membre depuis', value: `<t:${Math.floor((member?.joinedTimestamp || Date.now()) / 1000)}:R>`, inline: true }
+                    )
+                    .setFooter({ text: 'Vote avec 👍 ou 👎 — Profil communautaire' })
                     .setTimestamp();
 
-                if (voteImage) publicEmbed.setImage(voteImage);
-                if (targetUser) publicEmbed.setThumbnail(targetUser.displayAvatarURL({ dynamic: true }));
+                if (uploadedFile?.url) publicEmbed.setImage(uploadedFile.url);
 
-                // On note la cible pour le +1 vote
                 data.pendingSubmissions[submissionId] = {
                     type: 'vote2profil',
-                    authorId: interaction.user.id,
-                    targetId: targetId,
+                    authorId: author.id,
                     publicEmbedData: publicEmbed.toJSON(),
                     channelKey: 'vote2profil',
+                    attachmentUrl: uploadedFile?.url || null,
+                    addReactions: true,
                 };
             }
 
             // ── les_dossiers ─────────────────────────────────────────────────
             if (key === 'les_dossiers') {
-                const dossierInfo  = interaction.fields.getTextInputValue('dossierInfo').trim();
-                const dossierImage = interaction.fields.getTextInputValue('dossierImage').trim();
+                const dossierInfo   = interaction.fields.getTextInputValue('dossierInfo').trim();
+                // Récupérer le fichier uploadé (FileUploadBuilder)
+                const uploadedFiles = interaction.fields.getUploadedFiles('dossierImage');
+                const uploadedFile  = uploadedFiles?.[0] || null;
 
-                // Embed privé
+                // Embed privé (staff voit l'auteur)
                 privateEmbed = new EmbedBuilder()
                     .setTitle('🗂️ Nouveau Dossier — À Valider')
                     .setColor(0xFF6B35)
                     .addFields(
                         { name: '👤 Soumis par', value: `<@${interaction.user.id}> (${interaction.user.tag})`, inline: true },
-                        { name: '📋 Contenu', value: dossierInfo, inline: false }
+                        { name: '📋 Contenu', value: dossierInfo, inline: false },
+                        { name: '🖼️ Fichier joint', value: uploadedFile ? `[Voir le fichier](${uploadedFile.url})` : '*Aucun*', inline: false }
                     )
                     .setFooter({ text: `ID soumission: ${submissionId}` })
                     .setTimestamp();
 
-                if (dossierImage) privateEmbed.setImage(dossierImage);
+                if (uploadedFile?.url) privateEmbed.setImage(uploadedFile.url);
 
-                // Embed public (anonyme)
+                // Embed public — style épuré, contenu en avant
                 publicEmbed = new EmbedBuilder()
-                    .setTitle('🗂️ DOSSIER CONFIDENTIEL')
                     .setColor(0xFF6B35)
-                    .setDescription(
-                        '```\n████████████████████████\n█  DOCUMENT CLASSIFIÉ   █\n████████████████████████\n```\n' +
-                        `**Information :**\n${dossierImage ? `> ${dossierInfo}` : dossierInfo}`
-                    )
-                    .setFooter({ text: 'Source : Anonyme | Archives LE SECTEUR' })
+                    .setDescription(dossierInfo)
+                    .setFooter({ text: 'Source — Anonyme' })
                     .setTimestamp();
 
-                if (dossierImage) publicEmbed.setImage(dossierImage);
+                if (uploadedFile?.url) publicEmbed.setImage(uploadedFile.url);
 
                 data.pendingSubmissions[submissionId] = {
                     type: 'les_dossiers',
                     authorId: interaction.user.id,
                     publicEmbedData: publicEmbed.toJSON(),
                     channelKey: 'les_dossiers',
+                    attachmentUrl: uploadedFile?.url || null,
                 };
             }
 
@@ -1060,17 +1053,17 @@ client.on('interactionCreate', async interaction => {
                 const { EmbedBuilder: EB } = require('discord.js');
                 const publicEmbed = new EB(submission.publicEmbedData);
 
-                // Si c'est un vote → incrémenter les votes dans les données
+                // Pour vote2profil : marquer la soumission du jour (limite 1/jour)
                 if (submission.type === 'vote2profil') {
                     const today = new Date().toISOString().slice(0, 10);
-                    const userKey = `${submission.authorId}_${today}`;
+                    const userKey = `${submission.authorId}_submit_${today}`;
                     data.voteTracker = data.voteTracker || {};
                     data.voteTracker[userKey] = true;
 
                     // Nettoyage des anciens trackers (> 2 jours)
                     for (const k of Object.keys(data.voteTracker)) {
-                        const dateStr = k.split('_')[1];
-                        if (dateStr && dateStr < new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)) {
+                        const parts = k.split('_submit_');
+                        if (parts[1] && parts[1] < new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)) {
                             delete data.voteTracker[k];
                         }
                     }
@@ -1078,7 +1071,14 @@ client.on('interactionCreate', async interaction => {
 
                 saveCommuData(data);
 
-                await targetChannel.send({ embeds: [publicEmbed] });
+                // Publication dans le salon cible
+                const sentMsg = await targetChannel.send({ embeds: [publicEmbed] });
+
+                // Pour vote2profil : ajouter les réactions 👍 / 👎
+                if (submission.addReactions) {
+                    await sentMsg.react('👍').catch(() => {});
+                    await sentMsg.react('👎').catch(() => {});
+                }
 
                 // Éditer le message dans le salon de validation
                 const doneEmbed = new EmbedBuilder()
