@@ -278,13 +278,14 @@ const COMMAND_PERMS = {
 
 // Quotas de modération (utilisations par heure/fenêtre)
 const COMMAND_QUOTAS = {
-    'unmute': { limit: 10, window: 3600000 },
-    'tempmute': { limit: 10, window: 3600000 },
-    'mute': { limit: 2, window: 3600000 },
-    'kick': { limit: 3, window: 60000 }, // Anti-Nuke: 3 kicks / 1 min
-    'lock': { limit: 2, window: 3600000 },
-    'soumis': { limit: 2, window: 3600000 },
-    'rankup': { limit: 1, window: 7 * 24 * 60 * 60 * 1000 }
+    'unmute': { limit: 20, window: 3600000, desc: "Doit être supérieur au tempmute pour corriger les erreurs." },
+    'tempmute': { limit: 15, window: 3600000, desc: "Permet de gérer un groupe de 15 perturbateurs (très large)." },
+    'mute': { limit: 5, window: 3600000, desc: "Sanction définitive, doit être rare." },
+    'kick': { limit: 5, window: 3600000, desc: "(Gros changement) On ne kick pas 3 personnes par minute sans raison." },
+    'lock': { limit: 4, window: 3600000, desc: "Suffisant pour fermer les salons principaux en cas de crise." },
+    'vlock': { limit: 4, window: 3600000, desc: "Suffisant pour fermer les salons principaux en cas de crise." },
+    'soumis': { limit: 3, window: 3600000, desc: "C'est l'arme nucléaire, réservée aux cas extrêmes." },
+    'rankup': { limit: 1, window: 168 * 3600000, desc: "(7 jours) Garde ce quota, c'est une décision stratégique." }
 };
 
 // Suivi des quotas en mémoire (clé: userId-commandName)

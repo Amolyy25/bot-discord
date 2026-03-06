@@ -36,10 +36,13 @@ module.exports = {
         let quotaText = '';
         for (const [cmd, data] of Object.entries(COMMAND_QUOTAS)) {
             const windowMin = data.window / 60000;
-            const windowText = windowMin >= 60 ? `${windowMin / 60}h` : `${windowMin}min`;
-            quotaText += `• \`${cmd}\`: **${data.limit}** usages / ${windowText}\n`;
+            let windowText = windowMin >= 60 ? `${windowMin / 60}h` : `${windowMin}min`;
+            if (windowMin === 10080) windowText = '7 jours'; // 168h
+            
+            const desc = data.desc ? ` - *${data.desc}*` : '';
+            quotaText += `• \`${cmd}\`: **${data.limit}** / ${windowText}${desc}\n`;
         }
-        embed.addFields({ name: '⏳ Quotas de Sécurité', value: quotaText || 'Aucun quota configuré', inline: true });
+        embed.addFields({ name: '⏳ Quotas de Sécurité', value: quotaText || 'Aucun quota configuré', inline: false });
 
         // 3. Permissions Dynamiques (addperm)
         let dynamicText = '';
@@ -97,10 +100,13 @@ module.exports = {
         let quotaText = '';
         for (const [cmd, data] of Object.entries(COMMAND_QUOTAS)) {
             const windowMin = data.window / 60000;
-            const windowText = windowMin >= 60 ? `${windowMin / 60}h` : `${windowMin}min`;
-            quotaText += `• \`${cmd}\`: **${data.limit}** / ${windowText}\n`;
+            let windowText = windowMin >= 60 ? `${windowMin / 60}h` : `${windowMin}min`;
+            if (windowMin === 10080) windowText = '7 jours'; // 168h
+            
+            const desc = data.desc ? ` - *${data.desc}*` : '';
+            quotaText += `• \`${cmd}\`: **${data.limit}** / ${windowText}${desc}\n`;
         }
-        embed.addFields({ name: '⏳ Quotas', value: quotaText || 'Aucun', inline: true });
+        embed.addFields({ name: '⏳ Quotas', value: quotaText || 'Aucun', inline: false });
 
         let dynamicText = '';
         for (const cmd of Object.keys(perms)) {
