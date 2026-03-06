@@ -26,6 +26,7 @@ async function initDB() {
                 timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 expires_at TIMESTAMPTZ
             );
+
             CREATE TABLE IF NOT EXISTS user_trust (
                 user_id TEXT PRIMARY KEY,
                 trust_score INTEGER DEFAULT 50,
@@ -40,6 +41,32 @@ async function initDB() {
                 muted_until TIMESTAMPTZ,
                 weekly_constructive_count INTEGER DEFAULT 0
             );
+
+            -- Migrations pour les colonnes existantes (Sentinel v1 -> Sentinel v2)
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_trust' AND column_name='last_daily_update') THEN
+                    ALTER TABLE user_trust ADD COLUMN last_daily_update DATE;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_trust' AND column_name='invite_count') THEN
+                    ALTER TABLE user_trust ADD COLUMN invite_count INTEGER DEFAULT 0;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_trust' AND column_name='last_content') THEN
+                    ALTER TABLE user_trust ADD COLUMN last_content TEXT;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_trust' AND column_name='filtered_count') THEN
+                    ALTER TABLE user_trust ADD COLUMN filtered_count INTEGER DEFAULT 0;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_trust' AND column_name='muted_until') THEN
+                    ALTER TABLE user_trust ADD COLUMN muted_until TIMESTAMPTZ;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_trust' AND column_name='weekly_constructive_count') THEN
+                    ALTER TABLE user_trust ADD COLUMN weekly_constructive_count INTEGER DEFAULT 0;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_trust' AND column_name='last_bonus_date') THEN
+                    ALTER TABLE user_trust ADD COLUMN last_bonus_date TIMESTAMPTZ;
+                END IF;
+            END $$;
         `);
         console.log('[DB] Tables sanctions et user_trust vérifiées/créées.');
     } catch (err) {
