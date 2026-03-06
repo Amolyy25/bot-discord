@@ -11,7 +11,7 @@ const antinuke = require('./commands/utils/antiNukeHelper');
 const trust = require('./commands/utils/trustHelper');
 const { initDB } = require('./commands/utils/db');
 const { migrateSanctions } = require('./commands/utils/sanctionsHelper');
-const { ROLES } = require('./commands/utils/permHelper');
+const { ROLES, checkPermission, loadPermissions, checkAndConsumeRole } = require('./commands/utils/permHelper');
 const { AuditLogEvent } = require('discord.js');
 
 // Petit serveur HTTP pour le Health Check (port 8000 par défaut ou celui de l'hébergeur)
@@ -725,7 +725,6 @@ client.on('interactionCreate', async interaction => {
     if (!command) return;
 
     // Vérification des permissions et quotas
-    const { checkPermission } = require('./commands/utils/permHelper');
     const permResult = checkPermission(interaction.member, interaction.commandName);
     
     if (permResult === 'quota_reached') {
@@ -745,7 +744,6 @@ client.on('interactionCreate', async interaction => {
 
         // Vérifier si un rôle doit être consommé
         try {
-            const { checkAndConsumeRole } = require('./commands/utils/permHelper');
             await checkAndConsumeRole(interaction.member, interaction.commandName);
         } catch (e) {}
     } catch (error) {
@@ -871,7 +869,6 @@ client.on('messageCreate', async message => {
     if (!command) return;
 
     // Vérification des permissions et quotas
-    const { checkPermission } = require('./commands/utils/permHelper');
     const permResult = checkPermission(message.member, commandName);
     
     if (permResult === 'quota_reached') {
@@ -891,7 +888,6 @@ client.on('messageCreate', async message => {
 
         // Vérifier si un rôle doit être consommé
         try {
-            const { checkAndConsumeRole } = require('./commands/utils/permHelper');
             await checkAndConsumeRole(message.member, commandName);
         } catch (e) {}
     } catch (error) {
@@ -930,6 +926,10 @@ client.once(Events.ClientReady, () => {
     initDB().then(() => {
         migrateSanctions();
     });
+
+    // Charger et confirmer les permissions dynamiques
+    const perms = loadPermissions();
+    console.log(`[PermHelper] Système de permissions rechargé (${Object.keys(perms).length} commandes configurées) ✓`);
 
     // Initialiser l'anti-spam
     antispam.init(client);
