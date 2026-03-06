@@ -1,4 +1,5 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, Events, EmbedBuilder, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const commuSetup = require('./commands/setupcommu');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
@@ -718,6 +719,452 @@ client.on('interactionCreate', async interaction => {
         }
         return;
     }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ██████████████  SYSTÈME COMMUNAUTAIRE  ████████████████████████████
+    // ══════════════════════════════════════════════════════════════════════
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+    const COMMU_VALIDATION_CHANNEL = commuSetup.VALIDATION_CHANNEL;
+    const COMMU_VALIDATOR_ROLE     = commuSetup.VALIDATOR_ROLE;
+    const COMMU_CHANNELS_CONFIG    = commuSetup.CHANNELS_CONFIG;
+
+    // Charge / sauvegarde les données commu
+    const commuDataPath = path.join(__dirname, 'commuData.json');
+    function loadCommuData() {
+        try { return JSON.parse(fs.readFileSync(commuDataPath, 'utf8')); }
+        catch { return { confessionCount: 0, voteTracker: {}, pendingSubmissions: {} }; }
+    }
+    function saveCommuData(data) {
+        fs.writeFileSync(commuDataPath, JSON.stringify(data, null, 2));
+    }
+
+    // Trouve le salon cible en fonction de la clé de config
+    function findCommuChannel(guild, key) {
+        const cfg = COMMU_CHANNELS_CONFIG.find(c => c.key === key);
+        if (!cfg) return null;
+        return guild.channels.cache.find(c => c.name === cfg.name && c.parentId === commuSetup.CATEGORY_ID) || null;
+    }
+
+    // ─── Bouton : Ouvrir un Modal ──────────────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith('commu_btn_')) {
+        const key = interaction.customId.replace('commu_btn_', '');
+        const data = loadCommuData();
+
+        // ── vote2profil ──────────────────────────────────────────────────────
+        if (key === 'vote2profil') {
+            // Vérif limite 1 vote/jour
+            const today = new Date().toISOString().slice(0, 10);
+            const tracker = data.voteTracker || {};
+            const userKey = `${interaction.user.id}_${today}`;
+            if (tracker[userKey]) {
+                return interaction.reply({ content: '⏳ Tu as déjà voté aujourd\'hui ! Reviens demain.', flags: 64 });
+            }
+
+            const modal = new ModalBuilder()
+                .setCustomId('commu_modal_vote2profil')
+                .setTitle('🗳️ Voter pour un profil');
+
+            const targetInput = new TextInputBuilder()
+                .setCustomId('voteTarget')
+                .setLabel('ID ou @Mention de la personne')
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder('Ex: 123456789012345678 ou @Pseudo')
+                .setRequired(true);
+
+            const imageInput = new TextInputBuilder()
+                .setCustomId('voteImage')
+                .setLabel('Lien d\'une image (optionnel)')
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder('https://...')
+                .setRequired(false);
+
+            const commentInput = new TextInputBuilder()
+                .setCustomId('voteComment')
+                .setLabel('Commentaire (optionnel)')
+                .setStyle(TextInputStyle.Paragraph)
+                .setPlaceholder('Pourquoi voter pour cette personne ?')
+                .setRequired(false);
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(targetInput),
+                new ActionRowBuilder().addComponents(imageInput),
+                new ActionRowBuilder().addComponents(commentInput)
+            );
+            return await interaction.showModal(modal);
+        }
+
+        // ── les_dossiers ─────────────────────────────────────────────────────
+        if (key === 'les_dossiers') {
+            const modal = new ModalBuilder()
+                .setCustomId('commu_modal_les_dossiers')
+                .setTitle('🗂️ Soumettre un Dossier');
+
+            const infoInput = new TextInputBuilder()
+                .setCustomId('dossierInfo')
+                .setLabel('Votre information (restera anonyme)')
+                .setStyle(TextInputStyle.Paragraph)
+                .setPlaceholder('Décrivez l\'information en détail...')
+                .setRequired(true)
+                .setMaxLength(1500);
+
+            const imageInput = new TextInputBuilder()
+                .setCustomId('dossierImage')
+                .setLabel('Lien d\'une image (optionnel)')
+                .setStyle(TextInputStyle.Short)
+                .setPlaceholder('https://...')
+                .setRequired(false);
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(infoInput),
+                new ActionRowBuilder().addComponents(imageInput)
+            );
+            return await interaction.showModal(modal);
+        }
+
+        // ── confession ───────────────────────────────────────────────────────
+        if (key === 'confession') {
+            const modal = new ModalBuilder()
+                .setCustomId('commu_modal_confession')
+                .setTitle('🤫 Confessez-vous');
+
+            const confessionInput = new TextInputBuilder()
+                .setCustomId('confessionText')
+                .setLabel('Votre confession (totalement anonyme)')
+                .setStyle(TextInputStyle.Paragraph)
+                .setPlaceholder('Écrivez votre confession ici...')
+                .setRequired(true)
+                .setMaxLength(1500);
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(confessionInput)
+            );
+            return await interaction.showModal(modal);
+        }
+    }
+
+    // ─── Modal Submit : Préparer & Envoyer dans le salon de validation ─────────
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('commu_modal_')) {
+        const key = interaction.customId.replace('commu_modal_', '');
+        const data = loadCommuData();
+
+        try {
+            const validationChannel = await interaction.guild.channels.fetch(COMMU_VALIDATION_CHANNEL).catch(() => null);
+            if (!validationChannel) {
+                return interaction.reply({ content: '❌ Salon de validation introuvable. Contactez un admin.', flags: 64 });
+            }
+
+            let publicEmbed, privateEmbed, submissionId;
+            submissionId = `${key}_${Date.now()}_${interaction.user.id}`;
+
+            // ── vote2profil ──────────────────────────────────────────────────
+            if (key === 'vote2profil') {
+                const voteTarget   = interaction.fields.getTextInputValue('voteTarget').trim();
+                const voteImage    = interaction.fields.getTextInputValue('voteImage').trim();
+                const voteComment  = interaction.fields.getTextInputValue('voteComment').trim();
+
+                // Extraire l'ID si mention
+                const mentionMatch = voteTarget.match(/<@!?(\d+)>/);
+                const targetId = mentionMatch ? mentionMatch[1] : voteTarget.replace(/\D/g, '');
+                let targetUser = null;
+                try { targetUser = await client.users.fetch(targetId); } catch {}
+
+                // Embed privé (staff voit l'auteur et la cible)
+                privateEmbed = new EmbedBuilder()
+                    .setTitle('🗳️ Nouveau Vote — À Valider')
+                    .setColor(0xE91E8C)
+                    .addFields(
+                        { name: '🗳️ Vote émis par', value: `<@${interaction.user.id}> (${interaction.user.tag})`, inline: true },
+                        { name: '🎯 Vote pour', value: targetUser ? `<@${targetUser.id}> (${targetUser.tag})` : `ID: ${targetId}`, inline: true },
+                        { name: '💬 Commentaire', value: voteComment || '*Aucun*', inline: false }
+                    )
+                    .setFooter({ text: `ID soumission: ${submissionId}` })
+                    .setTimestamp();
+
+                if (voteImage) privateEmbed.setImage(voteImage);
+                if (targetUser) privateEmbed.setThumbnail(targetUser.displayAvatarURL({ dynamic: true }));
+
+                // Embed public (anonyme)
+                publicEmbed = new EmbedBuilder()
+                    .setTitle('🗳️ Nouveau Vote !')
+                    .setColor(0xE91E8C)
+                    .setDescription(`Un membre a voté pour <@${targetUser?.id || targetId}> !${voteComment ? `\n\n> *"${voteComment}"*` : ''}`)
+                    .setFooter({ text: 'Système de vote anonyme' })
+                    .setTimestamp();
+
+                if (voteImage) publicEmbed.setImage(voteImage);
+                if (targetUser) publicEmbed.setThumbnail(targetUser.displayAvatarURL({ dynamic: true }));
+
+                // On note la cible pour le +1 vote
+                data.pendingSubmissions[submissionId] = {
+                    type: 'vote2profil',
+                    authorId: interaction.user.id,
+                    targetId: targetId,
+                    publicEmbedData: publicEmbed.toJSON(),
+                    channelKey: 'vote2profil',
+                };
+            }
+
+            // ── les_dossiers ─────────────────────────────────────────────────
+            if (key === 'les_dossiers') {
+                const dossierInfo  = interaction.fields.getTextInputValue('dossierInfo').trim();
+                const dossierImage = interaction.fields.getTextInputValue('dossierImage').trim();
+
+                // Embed privé
+                privateEmbed = new EmbedBuilder()
+                    .setTitle('🗂️ Nouveau Dossier — À Valider')
+                    .setColor(0xFF6B35)
+                    .addFields(
+                        { name: '👤 Soumis par', value: `<@${interaction.user.id}> (${interaction.user.tag})`, inline: true },
+                        { name: '📋 Contenu', value: dossierInfo, inline: false }
+                    )
+                    .setFooter({ text: `ID soumission: ${submissionId}` })
+                    .setTimestamp();
+
+                if (dossierImage) privateEmbed.setImage(dossierImage);
+
+                // Embed public (anonyme)
+                publicEmbed = new EmbedBuilder()
+                    .setTitle('🗂️ DOSSIER CONFIDENTIEL')
+                    .setColor(0xFF6B35)
+                    .setDescription(
+                        '```\n████████████████████████\n█  DOCUMENT CLASSIFIÉ   █\n████████████████████████\n```\n' +
+                        `**Information :**\n${dossierImage ? `> ${dossierInfo}` : dossierInfo}`
+                    )
+                    .setFooter({ text: 'Source : Anonyme | Archives LE SECTEUR' })
+                    .setTimestamp();
+
+                if (dossierImage) publicEmbed.setImage(dossierImage);
+
+                data.pendingSubmissions[submissionId] = {
+                    type: 'les_dossiers',
+                    authorId: interaction.user.id,
+                    publicEmbedData: publicEmbed.toJSON(),
+                    channelKey: 'les_dossiers',
+                };
+            }
+
+            // ── confession ───────────────────────────────────────────────────
+            if (key === 'confession') {
+                const confessionText = interaction.fields.getTextInputValue('confessionText').trim();
+                data.confessionCount = (data.confessionCount || 0) + 1;
+                const confNum = data.confessionCount;
+
+                // Embed privé (staff voit l'auteur)
+                privateEmbed = new EmbedBuilder()
+                    .setTitle(`👀 Confession #${confNum} — À Valider`)
+                    .setColor(0x9B59B6)
+                    .addFields(
+                        { name: '👤 Écrit par', value: `<@${interaction.user.id}> (${interaction.user.tag})`, inline: true },
+                        { name: '📝 Confession', value: confessionText, inline: false }
+                    )
+                    .setFooter({ text: `ID soumission: ${submissionId}` })
+                    .setTimestamp();
+
+                // Embed public (totalement anonyme)
+                publicEmbed = new EmbedBuilder()
+                    .setTitle(`👀 Confession #${confNum}`)
+                    .setColor(0x9B59B6)
+                    .setDescription(`*"${confessionText}"*`)
+                    .setFooter({ text: `Confession #${confNum} — Totalement anonyme` })
+                    .setTimestamp();
+
+                data.pendingSubmissions[submissionId] = {
+                    type: 'confession',
+                    authorId: interaction.user.id,
+                    publicEmbedData: publicEmbed.toJSON(),
+                    channelKey: 'confession',
+                };
+            }
+
+            saveCommuData(data);
+
+            // ── Envoi dans le salon de validation ────────────────────────────
+            const approveRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`commu_approve_${submissionId}`)
+                    .setLabel('✅ Approuver & Publier')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId(`commu_refuse_${submissionId}`)
+                    .setLabel('❌ Refuser')
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+            const staffNotice = new EmbedBuilder()
+                .setDescription(`> **Action requise** — Seul le rôle <@&${COMMU_VALIDATOR_ROLE}> peut approuver ou refuser.\n> Type : \`${key}\``)
+                .setColor(0xFFFFFF);
+
+            await validationChannel.send({
+                content: `<@&${COMMU_VALIDATOR_ROLE}>`,
+                embeds: [staffNotice, privateEmbed],
+                components: [approveRow],
+            });
+
+            await interaction.reply({
+                content: '✅ Votre soumission a bien été envoyée au staff pour validation. Elle sera publiée prochainement !',
+                flags: 64,
+            });
+
+        } catch (err) {
+            console.error('[Commu] Erreur modal submit:', err);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: '❌ Une erreur est survenue.', flags: 64 });
+            }
+        }
+        return;
+    }
+
+    // ─── Boutons de validation (Approuver / Refuser) ───────────────────────────
+    if (interaction.isButton() && (interaction.customId.startsWith('commu_approve_') || interaction.customId.startsWith('commu_refuse_'))) {
+        // Vérification du rôle validateur
+        const hasValidatorRole = interaction.member.roles.cache.has(COMMU_VALIDATOR_ROLE);
+        const isAdminUser = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+        if (!hasValidatorRole && !isAdminUser) {
+            return interaction.reply({
+                content: `❌ Seuls les membres avec le rôle <@&${COMMU_VALIDATOR_ROLE}> peuvent valider ou refuser.`,
+                flags: 64,
+            });
+        }
+
+        const isApprove = interaction.customId.startsWith('commu_approve_');
+        const submissionId = interaction.customId.replace('commu_approve_', '').replace('commu_refuse_', '');
+
+        const data = loadCommuData();
+        const submission = data.pendingSubmissions?.[submissionId];
+
+        if (!submission) {
+            // Déjà traitée
+            await interaction.message.edit({ components: [] }).catch(() => {});
+            return interaction.reply({ content: '⚠️ Cette soumission a déjà été traitée ou est introuvable.', flags: 64 });
+        }
+
+        // Supprimer de la liste en attente
+        delete data.pendingSubmissions[submissionId];
+
+        if (isApprove) {
+            // ── Publication dans le bon salon ────────────────────────────────
+            try {
+                const targetChannel = findCommuChannel(interaction.guild, submission.channelKey);
+
+                if (!targetChannel) {
+                    saveCommuData(data);
+                    return interaction.reply({
+                        content: `❌ Salon de destination introuvable pour \`${submission.channelKey}\`. Vérifiez que le setup a été fait.`,
+                        flags: 64,
+                    });
+                }
+
+                // Rebuilder l'embed public depuis les données sauvegardées
+                const { EmbedBuilder: EB } = require('discord.js');
+                const publicEmbed = new EB(submission.publicEmbedData);
+
+                // Si c'est un vote → incrémenter les votes dans les données
+                if (submission.type === 'vote2profil') {
+                    const today = new Date().toISOString().slice(0, 10);
+                    const userKey = `${submission.authorId}_${today}`;
+                    data.voteTracker = data.voteTracker || {};
+                    data.voteTracker[userKey] = true;
+
+                    // Nettoyage des anciens trackers (> 2 jours)
+                    for (const k of Object.keys(data.voteTracker)) {
+                        const dateStr = k.split('_')[1];
+                        if (dateStr && dateStr < new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)) {
+                            delete data.voteTracker[k];
+                        }
+                    }
+                }
+
+                saveCommuData(data);
+
+                await targetChannel.send({ embeds: [publicEmbed] });
+
+                // Éditer le message dans le salon de validation
+                const doneEmbed = new EmbedBuilder()
+                    .setColor(0x00C851)
+                    .setDescription(`✅ **Approuvé & publié** par <@${interaction.user.id}> dans <#${targetChannel.id}>.`);
+
+                await interaction.message.edit({ embeds: [...interaction.message.embeds.slice(0, -1), doneEmbed], components: [] });
+                await interaction.reply({ content: `✅ Soumission publiée dans <#${targetChannel.id}> !`, flags: 64 });
+
+            } catch (err) {
+                console.error('[Commu] Erreur approbation:', err);
+                saveCommuData(data);
+                await interaction.reply({ content: `❌ Erreur lors de la publication : ${err.message}`, flags: 64 });
+            }
+
+        } else {
+            // ── Refus ────────────────────────────────────────────────────────
+            // Ouvrir un modal pour saisir la raison du refus
+            const refuseModal = new ModalBuilder()
+                .setCustomId(`commu_refuse_reason_${submissionId}`)
+                .setTitle('Refus de la soumission');
+
+            const reasonInput = new TextInputBuilder()
+                .setCustomId('refuseReason')
+                .setLabel('Raison du refus (optionnel)')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(false)
+                .setPlaceholder('Expliquez pourquoi cette soumission est refusée...');
+
+            refuseModal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
+
+            // Remettre la soumission temporairement (sera supprimée après le modal)
+            data.pendingSubmissions[submissionId] = submission;
+            saveCommuData(data);
+
+            return await interaction.showModal(refuseModal);
+        }
+        return;
+    }
+
+    // ─── Modal : Raison du refus ───────────────────────────────────────────────
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('commu_refuse_reason_')) {
+        const submissionId = interaction.customId.replace('commu_refuse_reason_', '');
+        const reason = interaction.fields.getTextInputValue('refuseReason').trim() || 'Aucune raison fournie';
+
+        const data = loadCommuData();
+        const submission = data.pendingSubmissions?.[submissionId];
+
+        if (!submission) {
+            return interaction.reply({ content: '⚠️ Soumission déjà traitée.', flags: 64 });
+        }
+
+        delete data.pendingSubmissions[submissionId];
+
+        // Notifier l'auteur de manière privée
+        try {
+            const author = await client.users.fetch(submission.authorId).catch(() => null);
+            if (author) {
+                const refusedEmbed = new EmbedBuilder()
+                    .setTitle('❌ Votre soumission a été refusée')
+                    .setColor(0xFF4444)
+                    .addFields(
+                        { name: 'Type', value: submission.type.replace(/_/g, ' '), inline: true },
+                        { name: 'Raison', value: reason, inline: false }
+                    )
+                    .setFooter({ text: 'LE SECTEUR — Modération Communautaire' })
+                    .setTimestamp();
+                await author.send({ embeds: [refusedEmbed] }).catch(() => {});
+            }
+        } catch {}
+
+        saveCommuData(data);
+
+        // Éditer le message de validation
+        const failEmbed = new EmbedBuilder()
+            .setColor(0xFF4444)
+            .setDescription(`❌ **Refusé** par <@${interaction.user.id}>.\n**Raison :** ${reason}`);
+
+        await interaction.message?.edit({ embeds: [...(interaction.message?.embeds?.slice(0, -1) || []), failEmbed], components: [] }).catch(() => {});
+        await interaction.reply({ content: `✅ Soumission refusée. L'auteur a été notifié.`, flags: 64 });
+        return;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ██████████████  FIN SYSTÈME COMMUNAUTAIRE  ███████████████████████████
+    // ══════════════════════════════════════════════════════════════════════
 
     if (!interaction.isChatInputCommand()) return;
 
