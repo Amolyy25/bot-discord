@@ -48,7 +48,8 @@ const client = new Client({
         GatewayIntentBits.GuildMessageReactions, // Ajout de l'intent pour les réactions
         GatewayIntentBits.GuildPresences // Requis pour le comptage des membres en ligne
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction] // Ajout des partiels pour gérer les messages non cachés
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction], // Ajout des partiels pour gérer les messages non cachés
+    rest: { version: '11' } // INDISPENSABLE pour FileUploadBuilder dans les modals
 });
 
 client.commands = new Collection();
@@ -773,16 +774,13 @@ client.on('interactionCreate', async interaction => {
                 .setRequired(true)
                 .setMaxLength(500);
 
-            const imageInput = new TextInputBuilder()
+            const imageUpload = new FileUploadBuilder()
                 .setCustomId('voteImage')
-                .setLabel('Photo (lien URL, optionnel)')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('https://imgur.com/... ou lien Discord CDN')
                 .setRequired(false);
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(descInput),
-                new ActionRowBuilder().addComponents(imageInput)
+                new ActionRowBuilder().addComponents(imageUpload)
             );
             return await interaction.showModal(modal);
         }
@@ -801,16 +799,13 @@ client.on('interactionCreate', async interaction => {
                 .setRequired(true)
                 .setMaxLength(1500);
 
-            const imageInput = new TextInputBuilder()
+            const imageUpload = new FileUploadBuilder()
                 .setCustomId('dossierImage')
-                .setLabel('Image (lien URL, optionnel)')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('https://imgur.com/... ou lien Discord CDN')
                 .setRequired(false);
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(infoInput),
-                new ActionRowBuilder().addComponents(imageInput)
+                new ActionRowBuilder().addComponents(imageUpload)
             );
             return await interaction.showModal(modal);
         }
@@ -853,8 +848,9 @@ client.on('interactionCreate', async interaction => {
             // ── vote2profil ──────────────────────────────────────────────────
             if (key === 'vote2profil') {
                 const voteDesc = interaction.fields.getTextInputValue('voteDesc').trim();
-                const voteImageUrl = interaction.fields.getTextInputValue('voteImage').trim();
-                const uploadedFile = voteImageUrl ? { url: voteImageUrl } : null;
+                // Récupérer le fichier uploadé via l'API v11
+                const uploadedFiles = interaction.fields.getUploadedFiles('voteImage');
+                const uploadedFile  = uploadedFiles.first() || null; // first() sur la collection d'attachments
 
                 // Le sujet c'est le membre lui-même
                 const author = interaction.user;
@@ -906,8 +902,9 @@ client.on('interactionCreate', async interaction => {
             // ── les_dossiers ─────────────────────────────────────────────────
             if (key === 'les_dossiers') {
                 const dossierInfo   = interaction.fields.getTextInputValue('dossierInfo').trim();
-                const dossierImageUrl = interaction.fields.getTextInputValue('dossierImage').trim();
-                const uploadedFile = dossierImageUrl ? { url: dossierImageUrl } : null;
+                // Récupérer le fichier uploadé via l'API v11
+                const uploadedFiles = interaction.fields.getUploadedFiles('dossierImage');
+                const uploadedFile  = uploadedFiles.first() || null;
 
                 // Embed privé (staff voit l'auteur)
                 privateEmbed = new EmbedBuilder()
