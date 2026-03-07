@@ -101,7 +101,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
             .setDescription(`*Tu es le bienvenu, amuse-toi bien ici ! Pour obtenir un boost d'xp x2 pendant 1 semaine et le <@&1471431323645378766> envoie ton premier message dans le chat !*`)
             .setColor(0xFFFFFF);
 
-        await channel.send({ content: `<@${member.id}> <@&1476171525471076536>`, embeds: [embed] });
+        await channel.send({ content: `<@&1476171525471076536>`, embeds: [embed] });
 
         // Enregistrer le nouveau membre pour sa récompense de premier message
         const pendingRewardsFile = path.join(__dirname, 'pendingRewards.json');
